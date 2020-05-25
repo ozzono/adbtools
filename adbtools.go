@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -204,4 +206,80 @@ func (device *device) Root() error {
 		return fmt.Errorf("Unable to restart adb as root; err: %v", output)
 	}
 	return nil
+}
+
+// Coverts XML block coords to center tap coords
+// Accepts [x1,y1][x2,y2] format as string and returns [2]int coords
+func XMLtoCoords(xmlcoords string) ([2]int, error) {
+	re := regexp.MustCompile("(\\[\\d+,\\d+\\]\\[\\d+,\\d+\\])")
+	if !re.MatchString(xmlcoords) {
+		return [2]int{0, 0}, fmt.Errorf("Unable to parse xmlcoords; Invalid format: %s", xmlcoords)
+	}
+	stringcoords := strings.Split(xmlcoords, "][")
+	leftcoords := strings.Split(string(stringcoords[0][1:]), ",")
+	rightcoords := strings.Split(string(stringcoords[1][:len(stringcoords[1])-1]), ",")
+	x1, err := strconv.Atoi(leftcoords[0])
+	if err != nil {
+		return [2]int{0, 0}, fmt.Errorf("atoi err: %v", err)
+	}
+	y1, err := strconv.Atoi(leftcoords[1])
+	if err != nil {
+		return [2]int{0, 0}, fmt.Errorf("atoi err: %v", err)
+	}
+	x2, err := strconv.Atoi(rightcoords[0])
+	if err != nil {
+		return [2]int{0, 0}, fmt.Errorf("atoi err: %v", err)
+	}
+	y2, err := strconv.Atoi(rightcoords[1])
+	if err != nil {
+		return [2]int{0, 0}, fmt.Errorf("atoi err: %v", err)
+	}
+	x := (x1 + x2) / 2
+	y := (y1 + y2) / 2
+	return [2]int{x, y}, nil
+}
+
+func (device *device) Orientation() (int, error) {
+	output := device.Shell("adb shell dumpsys input | grep 'SurfaceOrientation' | awk '{ print $2 }'")
+	orientation, err := strconv.Atoi(output)
+	if err != nil {
+		log.Printf("Failed to fetch device's orientation: %v", output)
+	}
+	return orientation
+}
+
+func (device *device) Portrait() error {
+	orientation, err := device.Orientation()
+	if err != nil {
+		return fmt.Errorf("Failed to fetch the orientation: %v", err)
+	}
+	if orientation == 1 {
+		device.AutoRotate(false)
+		device.Shell("adb shell input keyevent 26")
+	}
+	return nil
+}
+
+func (device *device) Landscape() error {
+	orientation, err := device.Orientation()
+	if err != nil {
+		return fmt.Errorf("Failed to fetch the orientation: %v", err)
+	}
+	if orientation == 1 {
+		device.AutoRotate(false)
+		device.Shell("adb shell input keyevent 26")
+	}
+	return nil
+}
+
+func (device *device) PowerButton() {
+	device.Shell("adb shell input keyevent 26")
+}
+
+func (device *device) AutoRotate(rotate bool) {
+	if rotate {
+		device.Shell("adb shell content insert --uri content://settings/system --bind name:s:accelerometer_rotation --bind value:i:1")
+	} else {
+		device.Shell("adb shell content insert --uri content://settings/system --bind name:s:accelerometer_rotation --bind value:i:0")
+	}
 }
