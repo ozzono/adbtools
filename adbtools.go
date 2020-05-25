@@ -243,9 +243,9 @@ func (device *device) Orientation() (int, error) {
 	output := device.Shell("adb shell dumpsys input | grep 'SurfaceOrientation' | awk '{ print $2 }'")
 	orientation, err := strconv.Atoi(output)
 	if err != nil {
-		log.Printf("Failed to fetch device's orientation: %v", output)
+		return 0, fmt.Errorf("Failed to fetch device's orientation: %v", output)
 	}
-	return orientation
+	return orientation, nil
 }
 
 func (device *device) Portrait() error {
