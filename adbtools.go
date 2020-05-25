@@ -147,7 +147,7 @@ func NewDevice(deviceID string) device {
 	return device{ID: deviceID, Log: false}
 }
 
-// StartAVD start the emulator with the given name
+// StartAVD starts the emulator with the given name
 // This method requires the Android Studio and Screen
 // programs to be installed
 func StartAVD(name string) error {
@@ -185,4 +185,23 @@ func (device *device) StartApp(pkg, activitie string) error {
 // Checks if the given app package is installed
 func (device *device) InstalledApp(pkg string) bool {
 	return len(strings.Split(device.Shell("adb shell pm list packages "+pkg), "\n")) > 0
+}
+
+// Records the screen as video with limited duration
+func (device *device) ScreenRecord(filename string, duration int) {
+	device.Shell(fmt.Sprintf("adb shell screenrecord -time-limit %d /sdcard/%s", duration, filename))
+}
+
+// Captures the screen as png
+func (device *device) ScreenCap(filename string) {
+	device.Shell("adb shell screencap /sdcard/" + filename)
+}
+
+// Enables all adb commands to be run as root
+func (device *device) Root() error {
+	output := device.Shell("adb root")
+	if len(strings.Split(output, "\n")) > 1 {
+		return fmt.Errorf("Unable to restart adb as root; err: %v", output)
+	}
+	return nil
 }
