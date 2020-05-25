@@ -46,25 +46,24 @@ func shell(arg string) string {
 	return string(out)
 }
 
-// Foreground verifies if the given package is on foreground
+// Verifies if the given package is on foreground
 func (device *device) Foreground(appPackage string) bool {
 	// TODO: futurally add string normalization
 	return strings.Contains(strings.ToLower(device.Shell("adb shell dumpsys window windows|grep Focus")), strings.ToLower(appPackage))
 }
 
-// TapScreen taps the given coords and waits the given delay in Milliseconds
+// Taps the given coords and waits the given delay in Milliseconds
 func (device *device) TapScreen(x, y, delay int) {
 	device.Shell(fmt.Sprintf("adb shell input tap %d %d", x, y))
 	sleep(delay)
 	return
 }
 
-//sets a sleep wait time in Millisecond
 func sleep(delay int) {
 	time.Sleep(time.Duration(delay) * time.Millisecond)
 }
 
-// XMLScreen fetches the screen xml data
+// Fetches the screen xml data
 func (device *device) XMLScreen(newdump bool) string {
 	if newdump {
 		device.Shell("adb shell uiautomator dump")
@@ -72,10 +71,10 @@ func (device *device) XMLScreen(newdump bool) string {
 	return device.Shell("adb shell cat /sdcard/window_dump.xml")
 }
 
-// TapCleanInput tap and cleans the input
+// Tap and cleans the input
 func (device *device) TapCleanInput(x, y, charcount int) {
 	charcount = charcount/2 + 1
-	devices.TapScreen(x, y, 0)
+	device.TapScreen(x, y, 0)
 	device.Shell("adb shell input keyevent KEYCODE_MOVE_END")
 	for i := 0; i < charcount; i++ {
 		device.Shell(`adb shell input keyevent --longpress $(printf 'KEYCODE_DEL %.0s' {1..2})`)
@@ -90,7 +89,7 @@ func (device *device) CloseApp(app string) {
 	device.Shell(fmt.Sprintf("adb shell am force-stop %s", app))
 }
 
-// ClearApp clears all the app data
+// Clears all the app data
 func (device *device) ClearApp(app string) error {
 	output := device.Shell(fmt.Sprintf("adb shell pm clear %s", app))
 	if strings.Contains(output, "Success") {
@@ -115,22 +114,25 @@ func (device *device) InputText(text string, splitted bool) error {
 	return nil
 }
 
+// Scroll down a fixed amount of pixels
 func (device *device) PageDown() {
 	// code 93 is equivalent to "KEYCODE_PAGE_DOWN"
 	device.Shell("adb shell input keyevent 93")
 }
 
+// Scroll up a fixed amount of pixels
 func (device *device) PageUp() {
 	// code 92 is equivalent to "KEYCODE_PAGE_UP"
 	device.Shell("adb shell input keyevent 92")
 }
 
+// Returns all the connected devices´ ID
 func Devices() ([]device, error) {
 	output := []device{}
 	count := 0
-	for _, row := range strings.Split(device.Shell("adb devices"), "\n") {
+	for _, row := range strings.Split(shell("adb devices"), "\n") {
 		if strings.HasSuffix(row, "device") {
-			output = append(output, Device{ID: strings.Split(row, "	")[0], Log: false})
+			output = append(output, device{ID: strings.Split(row, "	")[0], Log: false})
 			count++
 		}
 	}
@@ -138,9 +140,31 @@ func Devices() ([]device, error) {
 		return nil, fmt.Errorf("no devices found")
 	}
 	log.Printf("device count: %d\n", count)
-	return output
+	return output,nil
 }
 
 func NewDevice(deviceID string) device {
 	return device{ID: deviceID, Log: false}
+}
+
+// StartAVD start the emulator with the given name 
+// This method requires the Android Studio and Screen
+// programs to be installed
+func StartAVD(name string)error{
+	if !(shell("command -v android-studio|wc -l")=="1") {
+		return fmt.Errorf("Cannot start AVD emulator; Android Studio is not installed")
+	}
+	if !(shell("command -v screen|wc -l")=="1") {
+		return fmt.Errorf("Cannot start AVD emulator; Screen is not installed")
+	}
+	list:=shell("$HOME/Android/Sdx/emulator/emulator -list-avds")
+	avdlist:=strings.Split(list,"\n")
+	if len(avdlist)==0{
+		return fmt.Errorf("Cannot start AVD emulator; 0 devices found")
+	}
+	if !strings.Contains(list,name){
+		return fmt.Errorf("Cannot start AVD emulator; Device %s not found",name)
+	}
+	shell(fmt.Sprintf("screen -dmS avd_%s bash -c '$HOME/Android/Sdk/emulator/emulator -avd 480x800_android7.0'",name))
+	return nil
 }
