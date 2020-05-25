@@ -140,31 +140,45 @@ func Devices() ([]device, error) {
 		return nil, fmt.Errorf("no devices found")
 	}
 	log.Printf("device count: %d\n", count)
-	return output,nil
+	return output, nil
 }
 
 func NewDevice(deviceID string) device {
 	return device{ID: deviceID, Log: false}
 }
 
-// StartAVD start the emulator with the given name 
+// StartAVD start the emulator with the given name
 // This method requires the Android Studio and Screen
 // programs to be installed
-func StartAVD(name string)error{
-	if !(shell("command -v android-studio|wc -l")=="1") {
+func StartAVD(name string) error {
+	if !(shell("command -v android-studio|wc -l") == "1") {
 		return fmt.Errorf("Cannot start AVD emulator; Android Studio is not installed")
 	}
-	if !(shell("command -v screen|wc -l")=="1") {
+	if !(shell("command -v screen|wc -l") == "1") {
 		return fmt.Errorf("Cannot start AVD emulator; Screen is not installed")
 	}
-	list:=shell("$HOME/Android/Sdx/emulator/emulator -list-avds")
-	avdlist:=strings.Split(list,"\n")
-	if len(avdlist)==0{
+	list := shell("$HOME/Android/Sdx/emulator/emulator -list-avds")
+	avdlist := strings.Split(list, "\n")
+	if len(avdlist) == 0 {
 		return fmt.Errorf("Cannot start AVD emulator; 0 devices found")
 	}
-	if !strings.Contains(list,name){
-		return fmt.Errorf("Cannot start AVD emulator; Device %s not found",name)
+	if !strings.Contains(list, name) {
+		return fmt.Errorf("Cannot start AVD emulator; Device %s not found", name)
 	}
-	shell(fmt.Sprintf("screen -dmS avd_%s bash -c '$HOME/Android/Sdk/emulator/emulator -avd 480x800_android7.0'",name))
+	shell(fmt.Sprintf("screen -dmS avd_%s bash -c '$HOME/Android/Sdk/emulator/emulator -avd 480x800_android7.0'", name))
 	return nil
+}
+
+// Requires the package name with format com.packagename
+// and activitie such as com.packagename.MainActivity
+func (device *device) StartApp(pkg, activitie string) error {
+	if !device.InstalledApp(pkg) {
+		return fmt.Errorf("Cannot start %s; Package not found", pkg)
+	}
+	device.Shell(fmt.Sprintf("adb shell am start -n %s/%s", pkg, activitie))
+	return nil
+}
+
+func (device *device) InstalledApp(pkg string) bool {
+	return len(strings.Split(device.Shell("adb shell pm list packages "+pkg), "\n")) > 0
 }
