@@ -157,6 +157,9 @@ func StartAVD(name string) error {
 	if !(shell("command -v screen|wc -l") == "1") {
 		return fmt.Errorf("Cannot start AVD emulator; Screen is not installed")
 	}
+	if strings.Contains(shell("adb devices"), "name") {
+		return fmt.Errorf("Cannot start AVD emulator; %s is already running", name)
+	}
 	list := shell("$HOME/Android/Sdx/emulator/emulator -list-avds")
 	avdlist := strings.Split(list, "\n")
 	if len(avdlist) == 0 {
@@ -179,6 +182,7 @@ func (device *device) StartApp(pkg, activitie string) error {
 	return nil
 }
 
+// Checks if the given app package is installed
 func (device *device) InstalledApp(pkg string) bool {
 	return len(strings.Split(device.Shell("adb shell pm list packages "+pkg), "\n")) > 0
 }
