@@ -302,7 +302,7 @@ func (device *Device) Activities(packagename string) []string {
 
 // Loads the page in a default browser's new tab
 func (device *Device) DefaultBrowser(url string) error {
-	output := adb.Shell(fmt.Sprintf("adb shell am start -a \"android.intent.action.VIEW\" -d \"%s\"", url))
+	output := Shell(fmt.Sprintf("adb shell am start -a \"android.intent.action.VIEW\" -d \"%s\"", url))
 	if strings.Contains(strings.ToLower(output), "error") {
 		return fmt.Errorf("Failed to load page; output: \n%s", output)
 	}
