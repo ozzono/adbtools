@@ -15,7 +15,7 @@ var (
 	loglvl   bool
 )
 
-type device struct {
+type Device struct {
 	ID  string
 	Log bool
 }
@@ -25,7 +25,7 @@ type device struct {
 
 // Shell executes the given command in the Linux bash terminal
 // and return the command output as string
-func (device *device) Shell(arg string) string {
+func (device *Device) Shell(arg string) string {
 	if len(device.ID) > 0 {
 		arg = strings.Replace(arg, "adb", fmt.Sprintf("adb -s %s", device.ID), -1)
 	}
@@ -49,13 +49,13 @@ func shell(arg string) string {
 }
 
 // Verifies if the given package is on foreground
-func (device *device) Foreground(appPackage string) bool {
+func (device *Device) Foreground(appPackage string) bool {
 	// TODO: futurally add string normalization
 	return strings.Contains(strings.ToLower(device.Shell("adb shell dumpsys window windows|grep Focus")), strings.ToLower(appPackage))
 }
 
 // Taps the given coords and waits the given delay in Milliseconds
-func (device *device) TapScreen(x, y, delay int) {
+func (device *Device) TapScreen(x, y, delay int) {
 	device.Shell(fmt.Sprintf("adb shell input tap %d %d", x, y))
 	sleep(delay)
 	return
@@ -66,7 +66,7 @@ func sleep(delay int) {
 }
 
 // Fetches the screen xml data
-func (device *device) XMLScreen(newdump bool) string {
+func (device *Device) XMLScreen(newdump bool) string {
 	if newdump {
 		device.Shell("adb shell uiautomator dump")
 	}
@@ -74,7 +74,7 @@ func (device *device) XMLScreen(newdump bool) string {
 }
 
 // Tap and cleans the input
-func (device *device) TapCleanInput(x, y, charcount int) {
+func (device *Device) TapCleanInput(x, y, charcount int) {
 	charcount = charcount/2 + 1
 	device.TapScreen(x, y, 0)
 	device.Shell("adb shell input keyevent KEYCODE_MOVE_END")
@@ -83,16 +83,16 @@ func (device *device) TapCleanInput(x, y, charcount int) {
 	}
 }
 
-func (device *device) Swipe(coords [4]int) {
+func (device *Device) Swipe(coords [4]int) {
 	device.Shell(fmt.Sprintf("adb shell input swipe %d %d %d %d", coords[0], coords[1], coords[2], coords[3]))
 }
 
-func (device *device) CloseApp(app string) {
+func (device *Device) CloseApp(app string) {
 	device.Shell(fmt.Sprintf("adb shell am force-stop %s", app))
 }
 
 // Clears all the app data
-func (device *device) ClearApp(app string) error {
+func (device *Device) ClearApp(app string) error {
 	output := device.Shell(fmt.Sprintf("adb shell pm clear %s", app))
 	if strings.Contains(output, "Success") {
 		return nil
@@ -100,7 +100,7 @@ func (device *device) ClearApp(app string) error {
 	return fmt.Errorf("Failed to clear %s app data. Output: %s", app, output)
 }
 
-func (device *device) InputText(text string, splitted bool) error {
+func (device *Device) InputText(text string, splitted bool) error {
 	if len(text) == 0 {
 		return fmt.Errorf("invalid input; cannot be empty")
 	}
@@ -117,25 +117,28 @@ func (device *device) InputText(text string, splitted bool) error {
 }
 
 // Scroll down a fixed amount of pixels
-func (device *device) PageDown() {
+func (device *Device) PageDown() {
 	// code 93 is equivalent to "KEYCODE_PAGE_DOWN"
 	device.Shell("adb shell input keyevent 93")
 }
 
 // Scroll up a fixed amount of pixels
-func (device *device) PageUp() {
+func (device *Device) PageUp() {
 	// code 92 is equivalent to "KEYCODE_PAGE_UP"
 	device.Shell("adb shell input keyevent 92")
 }
 
 // Returns all the connected devices´ ID
-func Devices() ([]device, error) {
-	output := []device{}
+func Devices() ([]Device, error) {
+	output := []Device{}
 	count := 0
 	for _, row := range strings.Split(shell("adb devices"), "\n") {
 		if strings.HasSuffix(row, "device") {
-			output = append(output, device{ID: strings.Split(row, "	")[0], Log: false})
+			output = append(output, Device{ID: strings.Split(row, "	")[0], Log: false})
 			count++
+		} else if strings.HasSuffix(row, "offline") {
+			id := strings.Split(row, "	")[0]
+			log.Printf("%s device is offline", id)
 		}
 	}
 	if count == 0 {
@@ -145,8 +148,8 @@ func Devices() ([]device, error) {
 	return output, nil
 }
 
-func NewDevice(deviceID string) device {
-	return device{ID: deviceID, Log: false}
+func NewDevice(deviceID string) Device {
+	return Device{ID: deviceID, Log: false}
 }
 
 // StartAVD starts the emulator with the given name
@@ -176,31 +179,34 @@ func StartAVD(name string) error {
 
 // Requires the package name with format com.packagename
 // and activitie such as com.packagename.MainActivity
-func (device *device) StartApp(pkg, activitie string) error {
+func (device *Device) StartApp(pkg, activitie, options string) error {
 	if !device.InstalledApp(pkg) {
 		return fmt.Errorf("Cannot start %s; Package not found", pkg)
 	}
-	device.Shell(fmt.Sprintf("adb shell am start -n %s/%s", pkg, activitie))
-	return nil
+	output := device.Shell(fmt.Sprintf("adb shell am start -a -n %s/%s %s", pkg, activitie, options))
+	if output == "Success" {
+		return nil
+	}
+	return fmt.Errorf("Failed to start %s: %s", pkg, output)
 }
 
 // Checks if the given app package is installed
-func (device *device) InstalledApp(pkg string) bool {
+func (device *Device) InstalledApp(pkg string) bool {
 	return len(strings.Split(device.Shell("adb shell pm list packages "+pkg), "\n")) > 0
 }
 
 // Records the screen as video with limited duration
-func (device *device) ScreenRecord(filename string, duration int) {
+func (device *Device) ScreenRecord(filename string, duration int) {
 	device.Shell(fmt.Sprintf("adb shell screenrecord -time-limit %d /sdcard/%s", duration, filename))
 }
 
 // Captures the screen as png
-func (device *device) ScreenCap(filename string) {
+func (device *Device) ScreenCap(filename string) {
 	device.Shell("adb shell screencap /sdcard/" + filename)
 }
 
 // Enables all adb commands to be run as root
-func (device *device) Root() error {
+func (device *Device) Root() error {
 	output := device.Shell("adb root")
 	if len(strings.Split(output, "\n")) > 1 {
 		return fmt.Errorf("Unable to restart adb as root; err: %v", output)
@@ -239,7 +245,7 @@ func XMLtoCoords(xmlcoords string) ([2]int, error) {
 	return [2]int{x, y}, nil
 }
 
-func (device *device) Orientation() (int, error) {
+func (device *Device) Orientation() (int, error) {
 	output := device.Shell("adb shell dumpsys input | grep 'SurfaceOrientation' | awk '{ print $2 }'")
 	orientation, err := strconv.Atoi(output)
 	if err != nil {
@@ -248,7 +254,7 @@ func (device *device) Orientation() (int, error) {
 	return orientation, nil
 }
 
-func (device *device) Portrait() error {
+func (device *Device) Portrait() error {
 	orientation, err := device.Orientation()
 	if err != nil {
 		return fmt.Errorf("Failed to fetch the orientation: %v", err)
@@ -260,7 +266,7 @@ func (device *device) Portrait() error {
 	return nil
 }
 
-func (device *device) Landscape() error {
+func (device *Device) Landscape() error {
 	orientation, err := device.Orientation()
 	if err != nil {
 		return fmt.Errorf("Failed to fetch the orientation: %v", err)
@@ -272,14 +278,33 @@ func (device *device) Landscape() error {
 	return nil
 }
 
-func (device *device) PowerButton() {
+func (device *Device) PowerButton() {
 	device.Shell("adb shell input keyevent 26")
 }
 
-func (device *device) AutoRotate(rotate bool) {
+func (device *Device) AutoRotate(rotate bool) {
 	if rotate {
 		device.Shell("adb shell content insert --uri content://settings/system --bind name:s:accelerometer_rotation --bind value:i:1")
 	} else {
 		device.Shell("adb shell content insert --uri content://settings/system --bind name:s:accelerometer_rotation --bind value:i:0")
 	}
+}
+
+// Returns all package's activities
+func (device *Device) Activities(packagename string) []string {
+	list := strings.Split(device.Shell(fmt.Sprintf("adb shell dumpsys package | grep -i %s |grep Activity", packagename)), "\n")
+	output := []string{}
+	for i := range list {
+		output = append(output, strings.TrimPrefix(list[i], "package:"))
+	}
+	return output
+}
+
+// Loads the page in a default browser's new tab
+func (device *Device) DefaultBrowser(url string) error {
+	output := adb.Shell(fmt.Sprintf("adb shell am start -a \"android.intent.action.VIEW\" -d \"%s\"", url))
+	if strings.Contains(strings.ToLower(output), "error") {
+		return fmt.Errorf("Failed to load page; output: \n%s", output)
+	}
+	return nil
 }
