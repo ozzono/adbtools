@@ -3,6 +3,7 @@ package adbtools
 import (
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -11,8 +12,9 @@ import (
 )
 
 var (
-	deviceID string
-	loglvl   bool
+	deviceID     string
+	loglvl       bool
+	globalLogLvl bool
 )
 
 type Device struct {
@@ -36,22 +38,22 @@ func (device *Device) Shell(arg string) string {
 }
 
 func shell(arg string) string {
-	args := strings.Split(arg, " ")
-	out, err := exec.Command(args[0], args[1:]...).Output()
-	if err != nil {
-		log.Printf("Command: '%v'; Output: %v; Error: %v\n", arg, string(out), err)
-		return err.Error()
+	if globalLogLvl {
+		log.Printf("shell: %v", arg)
 	}
-	if out != nil && len(out) > 0 {
-		return fmt.Sprintf("Output:\n %s", out)
+	args := strings.Split(arg, " ")
+	out, err := exec.Command(args[0], args[1:]...).CombinedOutput()
+	if err != nil {
+		log.Printf("Command: '%v';\nOutput: %v;\nError: %v\n", arg, string(out), err)
+		return err.Error()
 	}
 	return string(out)
 }
 
 // Verifies if the given package is on foreground
-func (device *Device) Foreground(appPackage string) bool {
+func (device *Device) Foreground() string {
 	// TODO: futurally add string normalization
-	return strings.Contains(strings.ToLower(device.Shell("adb shell dumpsys window windows|grep Focus")), strings.ToLower(appPackage))
+	return strings.ToLower(device.Shell("adb shell dumpsys window windows|grep Focus"))
 }
 
 // Taps the given coords and waits the given delay in Milliseconds
@@ -153,27 +155,26 @@ func NewDevice(deviceID string) Device {
 }
 
 // StartAVD starts the emulator with the given name
-// This method requires the Android Studio and Screen
-// programs to be installed
+// This method requires the Android Studio to
+// be programs to be installed
+// ALERT: This method must be used as goroutine
 func StartAVD(name string) error {
-	if !(shell("command -v android-studio|wc -l") == "1") {
+	if len(strings.Split(shell("which android-studio"), "\n")) == 0 {
 		return fmt.Errorf("Cannot start AVD emulator; Android Studio is not installed")
 	}
-	if !(shell("command -v screen|wc -l") == "1") {
-		return fmt.Errorf("Cannot start AVD emulator; Screen is not installed")
-	}
-	if strings.Contains(shell("adb devices"), "name") {
+	if strings.Contains(shell("adb devices"), name) {
 		return fmt.Errorf("Cannot start AVD emulator; %s is already running", name)
 	}
-	list := shell("$HOME/Android/Sdx/emulator/emulator -list-avds")
-	avdlist := strings.Split(list, "\n")
-	if len(avdlist) == 0 {
-		return fmt.Errorf("Cannot start AVD emulator; 0 devices found")
+	home := os.Getenv("HOME")
+	if len(strings.Split(shell(fmt.Sprintf("ls %v/Android/Sdk/emulator/emulator", home)), "\n")) == 0 {
+		return fmt.Errorf("Cannot start AVD emulator; AVD manager not found")
 	}
-	if !strings.Contains(list, name) {
-		return fmt.Errorf("Cannot start AVD emulator; Device %s not found", name)
+	list := shell(fmt.Sprintf("%v/Android/Sdk/emulator/emulator -list-avds", home))
+	if !(strings.Contains(list, name)) {
+		return fmt.Errorf("Cannot start AVD emulator; %v device not found", name)
 	}
-	shell(fmt.Sprintf("screen -dmS avd_%s bash -c '$HOME/Android/Sdk/emulator/emulator -avd 480x800_android7.0'", name))
+	log.Printf("Booting avd: %v", name)
+	shell(home + "/Android/Sdk/emulator/emulator -avd " + name)
 	return nil
 }
 
@@ -307,4 +308,16 @@ func (device *Device) DefaultBrowser(url string) error {
 		return fmt.Errorf("Failed to load page; output: \n%s", output)
 	}
 	return nil
+}
+
+func GlobalLogLvl(lvl bool) {
+	globalLogLvl = lvl
+}
+
+func (device *Device) GetImei() string {
+	return device.Shell("adb shell \"service call iphonesubinfo 1 | toybox cut -d \\\"'\\\" -f2 | toybox grep -Eo '[0-9]' | toybox xargs | toybox sed 's/\\ //g'\"")
+}
+
+func (devive *Device) Shutdown() {
+	devive.Shell("adb shell reboot -p")
 }
