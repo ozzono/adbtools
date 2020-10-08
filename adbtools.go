@@ -126,7 +126,12 @@ func (device *Device) PageUp() {
 func Devices() ([]Device, error) {
 	output := []Device{}
 	count := 0
-	for _, row := range strings.Split(shell.Cmd("adb devices"), "\n") {
+	cmd, err := shell.Cmd("adb devices")
+	if err != nil {
+		log.Printf("shell.Cmd err: %v", err)
+		return nil, err
+	}
+	for _, row := range strings.Split(cmd, "\n") {
 		if strings.HasSuffix(row, "device") {
 			output = append(output, Device{ID: strings.Split(row, "	")[0], Log: false})
 			count++
@@ -151,17 +156,29 @@ func NewDevice(deviceID string) Device {
 // This method requires the Android Studio to be installed
 // ALERT: This method must be used as goroutine
 func StartAVD(name string) error {
-	if len(strings.Split(shell.Cmd("which android-studio"), "\n")) == 0 {
+	cmd, err := shell.Cmd("which android-studio")
+	if err != nil {
+		return fmt.Errorf("shell.Cmd err: %v", err)
+	}
+	if len(strings.Split(cmd, "\n")) == 0 {
 		return fmt.Errorf("Cannot start AVD emulator; Android Studio is not installed")
 	}
-	if strings.Contains(shell.Cmd("adb devices"), name) {
+	cmd, err = shell.Cmd("adb devices")
+	if err != nil {
+		return fmt.Errorf("shell.Cmd err: %v", err)
+	}
+	if strings.Contains(cmd, name) {
 		return fmt.Errorf("Cannot start AVD emulator; %s is already running", name)
 	}
 	home := os.Getenv("HOME")
-	if len(strings.Split(shell.Cmd(fmt.Sprintf("ls %v/Android/Sdk/emulator/emulator", home)), "\n")) == 0 {
+	cmd, err = shell.Cmd(fmt.Sprintf("ls %v/Android/Sdk/emulator/emulator", home))
+	if err != nil {
+		return fmt.Errorf("shell.Cmd err: %v", err)
+	}
+	if len(strings.Split(cmd, "\n")) == 0 {
 		return fmt.Errorf("Cannot start AVD emulator; AVD manager not found")
 	}
-	list := shell.Cmd(fmt.Sprintf("%v/Android/Sdk/emulator/emulator -list-avds", home))
+	list, err := shell.Cmd(fmt.Sprintf("%v/Android/Sdk/emulator/emulator -list-avds", home))
 	if !(strings.Contains(list, name)) {
 		return fmt.Errorf("Cannot start AVD emulator; %v device not found", name)
 	}
