@@ -94,6 +94,7 @@ func (device *Device) ClearApp(app string) error {
 	return fmt.Errorf("Failed to clear %s app data. Output: %s", app, output)
 }
 
+//InputText inserts a given text in a selected input
 func (device *Device) InputText(text string, splitted bool) error {
 	if len(text) == 0 {
 		return fmt.Errorf("invalid input; cannot be empty")
@@ -150,6 +151,29 @@ func Devices() ([]Device, error) {
 //NewDevice creates a new device management struct
 func NewDevice(deviceID string) Device {
 	return Device{ID: deviceID, Log: false}
+}
+
+// StartAnbox starts an Anbox Emulator
+// Before starting it only checks if Anbox is installed
+// Alert: Does not check if it's dependencies are installed
+// To install dependencies check the link below:
+// https://docs.anbox.io/userguide/install_kernel_modules.html
+// To install Anbox check the link below:
+// https://docs.anbox.io/userguide/install.html
+// Alert: no method was found to stop the anbox emulator
+func (device *Device) StartAnbox() error {
+	whereis, err := shell.Cmd("whereis anbox")
+	if err != nil {
+		return fmt.Errorf("shell.Cmd err: %v", err)
+	}
+	if len(whereis) == 0 {
+		return fmt.Errorf("anbox package not found")
+	}
+	_, err = shell.Cmd("anbox launch --package=org.anbox.appmgr --component=org.anbox.appmgr.AppViewActivity")
+	if err != nil {
+		return fmt.Errorf("shell.Cmd err: %v", err)
+	}
+	return nil
 }
 
 // StartAVD starts the emulator with the given name
