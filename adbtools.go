@@ -212,12 +212,12 @@ func StartAVD(name string) error {
 }
 
 // Requires the package name with format com.packagename
-// and activitie such as com.packagename.MainActivity
-func (device *Device) StartApp(pkg, activitie, options string) error {
+// and activity such as com.packagename.MainActivity
+func (device *Device) StartApp(pkg, activity, options string) error {
 	if !device.InstalledApp(pkg) {
 		return fmt.Errorf("Cannot start %s; Package not found", pkg)
 	}
-	output := device.Shell(fmt.Sprintf("adb shell am start -a -n %s/%s %s", pkg, activitie, options))
+	output := device.Shell(fmt.Sprintf("adb shell am start -a -n %s/%s %s", pkg, activity, options))
 	if output == "Success" {
 		return nil
 	}
