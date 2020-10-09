@@ -361,7 +361,8 @@ func (devive *Device) Shutdown() {
 // Note: Has limited retry count
 func (device *Device) WaitApp(pkg string, delay, maxRetry int) bool {
 	i := 0
-	for ; i < maxRetry && strings.Contains(device.Foreground(), pkg); i++ {
+	for ; i < maxRetry && !strings.Contains(device.Foreground(), pkg); i++ {
+		log.Printf("Waiting %s loading", pkg)
 		time.Sleep(time.Duration(delay) * time.Millisecond)
 	}
 	if i == maxRetry {
