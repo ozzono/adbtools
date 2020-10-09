@@ -354,3 +354,18 @@ func (device *Device) GetImei() string {
 func (devive *Device) Shutdown() {
 	devive.Shell("adb shell reboot -p")
 }
+
+// Waits until the given app appears on the foreground
+// Waits for given miliseconds after each try
+// Note: Has limited retry count
+func (device *Device) WaitApp(pkg string, delay, maxRetry int) bool {
+	i := 0
+	for ; i < maxRetry && strings.Contains(device.Foreground(), pkg); i++ {
+		time.Sleep(time.Duration(delay) * time.Millisecond)
+	}
+	if i == maxRetry {
+		log.Println("Desired app not found at the foreground")
+		return false
+	}
+	return true
+}
