@@ -161,7 +161,7 @@ func NewDevice(deviceID string) Device {
 // To install Anbox check the link below:
 // https://docs.anbox.io/userguide/install.html
 // Alert: no method was found to stop the anbox emulator
-func (device *Device) StartAnbox() error {
+func StartAnbox() error {
 	whereis, err := shell.Cmd("whereis anbox")
 	if err != nil {
 		return fmt.Errorf("shell.Cmd err: %v", err)
