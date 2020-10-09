@@ -169,6 +169,7 @@ func StartAnbox() error {
 	if len(whereis) == 0 {
 		return fmt.Errorf("anbox package not found")
 	}
+	log.Println("Starting Anbox emulator")
 	_, err = shell.Cmd("anbox launch --package=org.anbox.appmgr --component=org.anbox.appmgr.AppViewActivity")
 	if err != nil {
 		return fmt.Errorf("shell.Cmd err: %v", err)
