@@ -401,6 +401,10 @@ func (device *Device) ScreenSize() error {
 	return nil
 }
 
+func (device *Device) IsScreenON() bool {
+	return strings.Contains(device.Shell("adb shell dumpsys power | grep state"), "ON")
+}
+
 func cleanString(input string) string {
 	input = strings.Replace(input, " ", "", -1)
 	input = strings.Replace(input, "\n", "", -1)
