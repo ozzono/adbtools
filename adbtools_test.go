@@ -2,6 +2,7 @@ package adbtools
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -33,6 +34,12 @@ func TestMethods(t *testing.T) {
 		return
 	}
 
+	err = test.testStartApp()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 }
 
 func (t *testData) testScreenSize() error {
@@ -52,5 +59,18 @@ func (t *testData) testDumpPath() error {
 		return fmt.Errorf("Failed to fetch window_dump.xml")
 	}
 	t.t.Log("DumpPath test passed")
+	return nil
+}
+
+func (t *testData) testStartApp() error {
+	t.t.Log("testing StartApp; using firefox as test app")
+	err := t.device.StartApp("org.mozilla.firefox", "org.mozilla.gecko.BrowserApp", "")
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(t.device.Foreground(), "firefox") {
+		return fmt.Errorf("Failed to start org.mozilla.firefox app; not on foreground")
+	}
+	t.t.Log("StartApp test passed")
 	return nil
 }

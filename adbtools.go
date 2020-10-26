@@ -227,7 +227,7 @@ func (device *Device) StartApp(pkg, activity, options string) error {
 		return fmt.Errorf("Cannot start %s; Package not found", pkg)
 	}
 	output := device.Shell(fmt.Sprintf("adb shell am start -a -n %s/%s %s", pkg, activity, options))
-	if output == "Success" {
+	if strings.Contains(output, "Starting") {
 		return nil
 	}
 	return fmt.Errorf("Failed to start %s: %s", pkg, output)
