@@ -19,8 +19,12 @@ var (
 )
 
 type Device struct {
-	ID  string
-	Log bool
+	ID     string
+	Log    bool
+	Screen struct {
+		width  int
+		height int
+	}
 }
 
 // TODO: Validate the need of the given commands
@@ -379,4 +383,16 @@ func (device *Device) WaitApp(pkg string, delay, maxRetry int) bool {
 //WakeUp wakes the device up
 func (device *Device) WakeUp() {
 	device.Shell("adb shell input keyevent KEYCODE_WAKEUP")
+}
+
+//ScreenSize fetches the physical screen size and return its height and width
+func (device *Device) ScreenSize() error {
+	screen := device.Shell("adb shell wm size")
+	if !regexp.MustCompile("Physical size: (\\d+x\\d+)").MatchString(screen) {
+		return fmt.Errorf("Failed to fetch physical screen size; output: %s", screen)
+	}
+	sizes := strings.Split(strings.TrimPrefix(screen, "Physical size: "), "x")
+	device.Screen.width, _ = strconv.Atoi(sizes[0])
+	device.Screen.height, _ = strconv.Atoi(sizes[1])
+	return nil
 }
