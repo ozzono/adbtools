@@ -392,7 +392,7 @@ func (device *Device) ScreenSize() error {
 		return fmt.Errorf("Failed to fetch physical screen size; output: %s", screen)
 	}
 	sizes := strings.Split(strings.TrimPrefix(screen, "Physical size: "), "x")
-	device.Screen.width, _ = strconv.Atoi(sizes[0])
-	device.Screen.height, _ = strconv.Atoi(sizes[1])
+	device.Screen.Width, _ = strconv.Atoi(sizes[0])
+	device.Screen.Height, _ = strconv.Atoi(sizes[1])
 	return nil
 }
