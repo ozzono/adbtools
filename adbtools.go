@@ -19,9 +19,10 @@ var (
 )
 
 type Device struct {
-	ID     string
-	Log    bool
-	Screen struct {
+	ID       string
+	Log      bool
+	dumpPath string
+	Screen   struct {
 		Width  int
 		Height int
 	}
@@ -65,10 +66,13 @@ func sleep(delay int) {
 
 // Fetches the screen xml data
 func (device *Device) XMLScreen(newdump bool) string {
-	if newdump {
-		device.Shell("adb shell uiautomator dump")
+	if len(device.dumpPath) == 0 {
+		device.dumpPath = "/sdcard/window_dump.xml"
 	}
-	return device.Shell("adb shell cat /sdcard/window_dump.xml")
+	if newdump {
+		device.dumpPath = cleanString(strings.TrimPrefix(device.Shell("adb shell uiautomator dump"), "UI hierchary dumped to: "))
+	}
+	return device.Shell(fmt.Sprintf("adb shell cat %s", device.dumpPath))
 }
 
 // Tap and cleans the input
