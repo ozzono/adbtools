@@ -289,6 +289,7 @@ func (device *Device) Orientation() (int, error) {
 	return orientation, nil
 }
 
+//TODO: this method requires revision
 func (device *Device) Portrait() error {
 	orientation, err := device.Orientation()
 	if err != nil {
@@ -301,6 +302,7 @@ func (device *Device) Portrait() error {
 	return nil
 }
 
+//TODO: this method requires revision
 func (device *Device) Landscape() error {
 	orientation, err := device.Orientation()
 	if err != nil {
@@ -313,7 +315,9 @@ func (device *Device) Landscape() error {
 	return nil
 }
 
+//PowerButton emulates the pressing of the power button
 func (device *Device) PowerButton() {
+	// KEYCODE_POWER also works
 	device.Shell("adb shell input keyevent 26")
 }
 
@@ -370,4 +374,9 @@ func (device *Device) WaitApp(pkg string, delay, maxRetry int) bool {
 		return false
 	}
 	return true
+}
+
+//WakeUp wakes the device up
+func (device *Device) WakeUp() {
+	device.Shell("adb shell input keyevent KEYCODE_WAKEUP")
 }
