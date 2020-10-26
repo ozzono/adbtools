@@ -22,8 +22,8 @@ type Device struct {
 	ID     string
 	Log    bool
 	Screen struct {
-		width  int
-		height int
+		Width  int
+		Height int
 	}
 }
 
