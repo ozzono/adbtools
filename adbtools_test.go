@@ -9,6 +9,7 @@ func TestMethods(t *testing.T) {
 	devices, err := Devices()
 	if err != nil {
 		t.Errorf("Failed to get device list: %v", err)
+		return
 	}
 	device := devices[0]
 	err = device.testScreenSize()
@@ -16,7 +17,6 @@ func TestMethods(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	t.Logf("device.Screen: %#v", device.Screen)
 }
 
 func (device *Device) testScreenSize() error {
