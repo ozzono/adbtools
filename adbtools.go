@@ -10,19 +10,20 @@ import (
 	"time"
 
 	shell "github.com/ozzono/go-shell"
+	"github.com/ozzono/normalize"
 )
 
 var (
-	deviceID     string
-	loglvl       bool
-	globalLogLvl bool
+	deviceID string
 )
 
+// Device may structure
 type Device struct {
-	ID       string
-	Log      bool
-	dumpPath string
-	Screen   struct {
+	ID           string
+	Log          bool
+	dumpPath     string
+	DefaultSleep int
+	Screen       struct {
 		Width  int
 		Height int
 	}
@@ -40,6 +41,9 @@ func (device *Device) Shell(arg string) string {
 	if device.Log {
 		log.Println(arg)
 	}
+	if device.DefaultSleep == 0 {
+		device.DefaultSleep = 100
+	}
 	out, err := shell.Cmd(arg)
 	if err != nil {
 		log.Printf("shell.Cmd err: %v", err)
@@ -47,24 +51,24 @@ func (device *Device) Shell(arg string) string {
 	return out
 }
 
-// Verifies if the given package is on foreground
+// Foreground verifies if the given package is on foreground
 func (device *Device) Foreground() string {
 	// TODO: futurally add string normalization
 	return strings.ToLower(device.Shell("adb shell dumpsys window windows|grep Focus"))
 }
 
-// Taps the given coords and waits the given delay in Milliseconds
+// TapScreen taps the given coords and waits the given delay in Milliseconds
 func (device *Device) TapScreen(x, y, delay int) {
 	device.Shell(fmt.Sprintf("adb shell input tap %d %d", x, y))
-	sleep(delay)
+	device.sleep(delay)
 	return
 }
 
-func sleep(delay int) {
-	time.Sleep(time.Duration(delay) * time.Millisecond)
+func (device *Device) sleep(delay int) {
+	time.Sleep(time.Duration(device.DefaultSleep*delay) * time.Millisecond)
 }
 
-// Fetches the screen xml data
+// XMLScreen fetches the screen xml data
 func (device *Device) XMLScreen(newdump bool) string {
 	if len(device.dumpPath) == 0 {
 		device.dumpPath = "/sdcard/window_dump.xml"
@@ -75,7 +79,7 @@ func (device *Device) XMLScreen(newdump bool) string {
 	return device.Shell(fmt.Sprintf("adb shell cat %s", device.dumpPath))
 }
 
-// Tap and cleans the input
+// TapCleanInput tap and cleans the input
 func (device *Device) TapCleanInput(x, y, charcount int) {
 	charcount = charcount/2 + 1
 	device.TapScreen(x, y, 0)
@@ -85,15 +89,17 @@ func (device *Device) TapCleanInput(x, y, charcount int) {
 	}
 }
 
+// Swipe swipes the screen with [x1,y1,x2,y2] coords format
 func (device *Device) Swipe(coords [4]int) {
 	device.Shell(fmt.Sprintf("adb shell input swipe %d %d %d %d", coords[0], coords[1], coords[2], coords[3]))
 }
 
+// CloseApp closes the app
 func (device *Device) CloseApp(app string) {
 	device.Shell(fmt.Sprintf("adb shell am force-stop %s", app))
 }
 
-// Clears all the app data
+// ClearApp clears all the app data
 func (device *Device) ClearApp(app string) error {
 	output := device.Shell(fmt.Sprintf("adb shell pm clear %s", app))
 	if strings.Contains(output, "Success") {
@@ -119,19 +125,20 @@ func (device *Device) InputText(text string, splitted bool) error {
 	return nil
 }
 
-// Scroll down a fixed amount of pixels
+// PageDown scrolls down a fixed amount of pixels
 func (device *Device) PageDown() {
 	// code 93 is equivalent to "KEYCODE_PAGE_DOWN"
 	device.Shell("adb shell input keyevent 93")
 }
 
+// PageUp scrolls up a fixed amount of pixels
 // Scroll up a fixed amount of pixels
 func (device *Device) PageUp() {
 	// code 92 is equivalent to "KEYCODE_PAGE_UP"
 	device.Shell("adb shell input keyevent 92")
 }
 
-// Returns all the connected devices´ ID
+// Devices returns all the connected devices´ ID
 func Devices() ([]Device, error) {
 	output := []Device{}
 	count := 0
@@ -220,7 +227,7 @@ func StartAVD(name string) error {
 	return nil
 }
 
-// Requires the package name with format com.packagename
+// StartApp requires the package name with format com.packagename
 // and activity such as com.packagename.MainActivity
 func (device *Device) StartApp(pkg, activity, options string) error {
 	if !device.InstalledApp(pkg) {
@@ -233,22 +240,24 @@ func (device *Device) StartApp(pkg, activity, options string) error {
 	return fmt.Errorf("Failed to start %s: %s", pkg, output)
 }
 
-// Checks if the given app package is installed
+// InstalledApp checks if the given app package is installed
 func (device *Device) InstalledApp(pkg string) bool {
 	return len(strings.Split(device.Shell("adb shell pm list packages "+pkg), "\n")) > 0
 }
 
-// Records the screen as video with limited duration
+// ScreenRecord records the screen as video with limited duration
+// Uses mp4 format
 func (device *Device) ScreenRecord(filename string, duration int) {
 	device.Shell(fmt.Sprintf("adb shell screenrecord -time-limit %d /sdcard/%s", duration, filename))
 }
 
-// Captures the screen as png
+// ScreenCap captures the screen as png
 func (device *Device) ScreenCap(filename string) {
 	device.Shell("adb shell screencap /sdcard/" + filename)
 }
 
-// Enables all adb commands to be run as root
+// Root enables all adb commands to be run as root
+// Only works in rooted devices or emulators
 func (device *Device) Root() error {
 	output := device.Shell("adb root")
 	if len(strings.Split(output, "\n")) > 1 {
@@ -257,7 +266,7 @@ func (device *Device) Root() error {
 	return nil
 }
 
-// Coverts XML block coords to center tap coords
+// XMLtoCoords coverts XML block coords to center tap coords
 // Accepts [x1,y1][x2,y2] format as string and returns [2]int coords
 func XMLtoCoords(xmlcoords string) ([2]int, error) {
 	re := regexp.MustCompile("(\\[\\d+,\\d+\\]\\[\\d+,\\d+\\])")
@@ -288,6 +297,9 @@ func XMLtoCoords(xmlcoords string) ([2]int, error) {
 	return [2]int{x, y}, nil
 }
 
+// Orientation returns the devices orientation
+// 0: portrait
+// 1: landscape
 func (device *Device) Orientation() (int, error) {
 	output := device.Shell("adb shell dumpsys input | grep 'SurfaceOrientation' | awk '{ print $2 }'")
 	orientation, err := strconv.Atoi(output)
@@ -298,30 +310,30 @@ func (device *Device) Orientation() (int, error) {
 }
 
 //TODO: this method requires revision
-func (device *Device) Portrait() error {
-	orientation, err := device.Orientation()
-	if err != nil {
-		return fmt.Errorf("Failed to fetch the orientation: %v", err)
-	}
-	if orientation == 1 {
-		device.AutoRotate(false)
-		device.Shell("adb shell input keyevent 26")
-	}
-	return nil
-}
+// func (device *Device) Portrait() error {
+// 	orientation, err := device.Orientation()
+// 	if err != nil {
+// 		return fmt.Errorf("Failed to fetch the orientation: %v", err)
+// 	}
+// 	if orientation == 1 {
+// 		device.AutoRotate(false)
+// 		device.Shell("adb shell input keyevent 26")
+// 	}
+// 	return nil
+// }
 
 //TODO: this method requires revision
-func (device *Device) Landscape() error {
-	orientation, err := device.Orientation()
-	if err != nil {
-		return fmt.Errorf("Failed to fetch the orientation: %v", err)
-	}
-	if orientation == 1 {
-		device.AutoRotate(false)
-		device.Shell("adb shell input keyevent 26")
-	}
-	return nil
-}
+// func (device *Device) Landscape() error {
+// 	orientation, err := device.Orientation()
+// 	if err != nil {
+// 		return fmt.Errorf("Failed to fetch the orientation: %v", err)
+// 	}
+// 	if orientation == 1 {
+// 		device.AutoRotate(false)
+// 		device.Shell("adb shell input keyevent 26")
+// 	}
+// 	return nil
+// }
 
 //PowerButton emulates the pressing of the power button
 func (device *Device) PowerButton() {
@@ -329,6 +341,7 @@ func (device *Device) PowerButton() {
 	device.Shell("adb shell input keyevent 26")
 }
 
+// AutoRotate enables or disables the device auto rotation behaviour
 func (device *Device) AutoRotate(rotate bool) {
 	if rotate {
 		device.Shell("adb shell content insert --uri content://settings/system --bind name:s:accelerometer_rotation --bind value:i:1")
@@ -337,7 +350,7 @@ func (device *Device) AutoRotate(rotate bool) {
 	}
 }
 
-// Returns all package's activities
+// Activities returns all package's activities
 func (device *Device) Activities(packagename string) []string {
 	list := strings.Split(device.Shell(fmt.Sprintf("adb shell dumpsys package | grep -i %s |grep Activity", packagename)), "\n")
 	output := []string{}
@@ -347,7 +360,7 @@ func (device *Device) Activities(packagename string) []string {
 	return output
 }
 
-// Loads the page in a default browser's new tab
+// DefaultBrowser loads the page in a default browser's new tab
 func (device *Device) DefaultBrowser(url string) error {
 	output := device.Shell(fmt.Sprintf("adb shell am start -a \"android.intent.action.VIEW\" -d \"%s\"", url))
 	if strings.Contains(strings.ToLower(output), "error") {
@@ -356,26 +369,27 @@ func (device *Device) DefaultBrowser(url string) error {
 	return nil
 }
 
-func GlobalLogLvl(lvl bool) {
-	globalLogLvl = lvl
-}
-
+// GetImei returns the device IMEI
 func (device *Device) GetImei() string {
 	return device.Shell("adb shell \"service call iphonesubinfo 1 | toybox cut -d \\\"'\\\" -f2 | toybox grep -Eo '[0-9]' | toybox xargs | toybox sed 's/\\ //g'\"")
 }
 
-func (devive *Device) Shutdown() {
-	devive.Shell("adb shell reboot -p")
+// Shutdown turns the device off
+func (device *Device) Shutdown() {
+	device.Shell("adb shell reboot -p")
 }
 
-// Waits until the given app appears on the foreground
+// WaitApp waits until the given app appears on the foreground
 // Waits for given miliseconds after each try
 // Note: Has limited retry count
 func (device *Device) WaitApp(pkg string, delay, maxRetry int) bool {
 	i := 0
 	for ; i < maxRetry && !strings.Contains(device.Foreground(), pkg); i++ {
-		log.Printf("Waiting %s loading", pkg)
+		if device.Log {
+			log.Printf("Waiting %s loading", pkg)
+		}
 		time.Sleep(time.Duration(delay) * time.Millisecond)
+		device.sleep(delay)
 	}
 	if i == maxRetry {
 		log.Println("Desired app not found at the foreground")
@@ -401,8 +415,39 @@ func (device *Device) ScreenSize() error {
 	return nil
 }
 
+// IsScreenON verifies if the is on
 func (device *Device) IsScreenON() bool {
 	return strings.Contains(device.Shell("adb shell dumpsys power | grep state"), "ON")
+}
+
+//HasInScreen verifies if the wanted text appear on screen
+func (device *Device) HasInScreen(want string, newDump bool) bool {
+	return strings.Contains(
+		strings.ToLower(normalize.Norm(device.XMLScreen(newDump))),
+		strings.ToLower(normalize.Norm(want)),
+	)
+}
+
+// WaitInScreen waits until the wanted text appear on screen
+// It requires a max retry count to avoid endless loop
+func (device *Device) WaitInScreen(want string, retryCount int) error {
+	if device.DefaultSleep == 0 {
+		return fmt.Errorf("Invalid device.DefaultSleep; must be > 0")
+	}
+	for !device.HasInScreen(want, true) {
+		if device.Log {
+			log.Println("Waiting app load")
+		}
+		device.sleep(10)
+		if device.HasInScreen(want, true) {
+			break
+		}
+		if retryCount == 0 {
+			return fmt.Errorf("Reached max retry count of %d", retryCount)
+		}
+		retryCount--
+	}
+	return nil
 }
 
 func cleanString(input string) string {
