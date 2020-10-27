@@ -435,16 +435,16 @@ func (device *Device) HasInScreen(newDump bool, want ...string) bool {
 
 // WaitInScreen waits until the wanted text appear on screen
 // It requires a max retry count to avoid endless loop
-func (device *Device) WaitInScreen(want string, retryCount int) error {
+func (device *Device) WaitInScreen(retryCount int, want ...string) error {
 	if device.DefaultSleep == 0 {
 		return fmt.Errorf("Invalid device.DefaultSleep; must be > 0")
 	}
-	for !device.HasInScreen(want, true) {
+	for !device.HasInScreen(true, want...) {
 		if device.Log {
 			log.Println("Waiting app load")
 		}
 		device.sleep(10)
-		if device.HasInScreen(want, true) {
+		if device.HasInScreen(true, want...) {
 			break
 		}
 		if retryCount == 0 {
