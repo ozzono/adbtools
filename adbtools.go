@@ -421,11 +421,16 @@ func (device *Device) IsScreenON() bool {
 }
 
 //HasInScreen verifies if the wanted text appear on screen
-func (device *Device) HasInScreen(want string, newDump bool) bool {
-	return strings.Contains(
-		strings.ToLower(normalize.Norm(device.XMLScreen(newDump))),
-		strings.ToLower(normalize.Norm(want)),
-	)
+func (device *Device) HasInScreen(newDump bool, want ...string) bool {
+	for i := range want {
+		if strings.Contains(
+			strings.ToLower(normalize.Norm(device.XMLScreen(newDump))),
+			strings.ToLower(normalize.Norm(want[i])),
+		) {
+			return true
+		}
+	}
+	return false
 }
 
 // WaitInScreen waits until the wanted text appear on screen
