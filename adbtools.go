@@ -309,32 +309,6 @@ func (device *Device) Orientation() (int, error) {
 	return orientation, nil
 }
 
-//TODO: this method requires revision
-// func (device *Device) Portrait() error {
-// 	orientation, err := device.Orientation()
-// 	if err != nil {
-// 		return fmt.Errorf("Failed to fetch the orientation: %v", err)
-// 	}
-// 	if orientation == 1 {
-// 		device.AutoRotate(false)
-// 		device.Shell("adb shell input keyevent 26")
-// 	}
-// 	return nil
-// }
-
-//TODO: this method requires revision
-// func (device *Device) Landscape() error {
-// 	orientation, err := device.Orientation()
-// 	if err != nil {
-// 		return fmt.Errorf("Failed to fetch the orientation: %v", err)
-// 	}
-// 	if orientation == 1 {
-// 		device.AutoRotate(false)
-// 		device.Shell("adb shell input keyevent 26")
-// 	}
-// 	return nil
-// }
-
 //PowerButton emulates the pressing of the power button
 func (device *Device) PowerButton() {
 	// KEYCODE_POWER also works
@@ -383,17 +357,23 @@ func (device *Device) Shutdown() {
 // Waits for given miliseconds after each try
 // Note: Has limited retry count
 func (device *Device) WaitApp(pkg string, delay, maxRetry int) bool {
-	i := 0
-	for ; i < maxRetry && !strings.Contains(device.Foreground(), pkg); i++ {
+	for !strings.Contains(device.Foreground(), pkg) {
+		device.sleep(device.DefaultSleep * delay)
+
+		if maxRetry == 0 {
+			log.Println("Reached max retry count")
+			log.Printf("%s package not found at the foreground", pkg)
+			return false
+		}
+		maxRetry--
+
+		if strings.Contains(device.Foreground(), pkg) {
+			break
+		}
+
 		if device.Log {
 			log.Printf("Waiting %s loading", pkg)
 		}
-		time.Sleep(time.Duration(delay) * time.Millisecond)
-		device.sleep(delay)
-	}
-	if i == maxRetry {
-		log.Println("Desired app not found at the foreground")
-		return false
 	}
 	return true
 }
@@ -461,3 +441,29 @@ func cleanString(input string) string {
 	input = strings.Replace(input, "\r", "", -1)
 	return input
 }
+
+//TODO: this method requires revision
+// func (device *Device) Portrait() error {
+// 	orientation, err := device.Orientation()
+// 	if err != nil {
+// 		return fmt.Errorf("Failed to fetch the orientation: %v", err)
+// 	}
+// 	if orientation == 1 {
+// 		device.AutoRotate(false)
+// 		device.Shell("adb shell input keyevent 26")
+// 	}
+// 	return nil
+// }
+
+//TODO: this method requires revision
+// func (device *Device) Landscape() error {
+// 	orientation, err := device.Orientation()
+// 	if err != nil {
+// 		return fmt.Errorf("Failed to fetch the orientation: %v", err)
+// 	}
+// 	if orientation == 1 {
+// 		device.AutoRotate(false)
+// 		device.Shell("adb shell input keyevent 26")
+// 	}
+// 	return nil
+// }

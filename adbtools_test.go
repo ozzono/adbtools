@@ -2,7 +2,6 @@ package adbtools
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 )
 
@@ -68,9 +67,11 @@ func (t *testData) testStartApp() error {
 	if err != nil {
 		return err
 	}
-	if !strings.Contains(t.device.Foreground(), "firefox") {
-		return fmt.Errorf("Failed to start org.mozilla.firefox app; not on foreground")
+
+	if !t.device.WaitApp("org.mozilla.firefox", 1000, 5) {
+		return fmt.Errorf("failed to start org.mozilla.firefox")
 	}
+
 	t.t.Log("StartApp test passed")
 	return nil
 }
