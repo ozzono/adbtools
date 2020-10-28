@@ -3,6 +3,7 @@ package adbtools
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"regexp"
 	"strconv"
@@ -413,12 +414,26 @@ func (device *Device) IsScreenON() bool {
 
 //HasInScreen verifies if the wanted text appear on screen
 func (device *Device) HasInScreen(newDump bool, want ...string) bool {
-	for i := range want {
+	for len(want) > 0 {
+		i := 0
+		if len(want) != 1 {
+			i = rand.New(rand.NewSource(time.Now().UnixNano())).Intn(len(want) - 1)
+		}
+
+		if device.Log {
+			log.Printf("Searching screen %s", strings.ToLower(normalize.Norm(want[i])))
+		}
 		if strings.Contains(
 			strings.ToLower(normalize.Norm(device.XMLScreen(newDump))),
 			strings.ToLower(normalize.Norm(want[i])),
 		) {
 			return true
+		}
+
+		if len(want) != 1 {
+			want = append(want[:i], want[i+1:]...)
+		} else {
+			want = want[1:]
 		}
 	}
 	return false
