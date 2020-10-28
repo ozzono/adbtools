@@ -14,11 +14,7 @@ import (
 	"github.com/ozzono/normalize"
 )
 
-var (
-	deviceID string
-)
-
-// Device may structure
+// Device main structure
 type Device struct {
 	ID           string
 	Log          bool
@@ -145,7 +141,6 @@ func (device *Device) PageDown() {
 }
 
 // PageUp scrolls up a fixed amount of pixels
-// Scrolls up a fixed amount of pixels
 func (device *Device) PageUp() {
 	// code 92 is equivalent to "KEYCODE_PAGE_UP"
 	device.Shell("adb shell input keyevent 92")
@@ -181,12 +176,17 @@ func NewDevice(deviceID string, log bool) Device {
 }
 
 // StartAnbox starts an Anbox Emulator
+//
 // Before starting it only checks if Anbox is installed
+//
 // Alert: Does not check if its dependencies are installed
-// To install dependencies check the link below:
+//
+// To install dependencies check the link:
 // https://docs.anbox.io/userguide/install_kernel_modules.html
-// To install Anbox check the link below:
+//
+// To install Anbox check the link:
 // https://docs.anbox.io/userguide/install.html
+//
 // Alert: no method was found to stop the anbox emulator
 func StartAnbox() error {
 	whereis, err := shell.Cmd("whereis anbox")
@@ -205,8 +205,11 @@ func StartAnbox() error {
 }
 
 // StartAVD starts the emulator with the given name
+//
 // This method requires the Android Studio to be installed
+//
 // ALERT: This method must be used as goroutine
+//
 func StartAVD(name string) error {
 	cmd, err := shell.Cmd("which android-studio")
 	if err != nil {
@@ -257,7 +260,7 @@ func (device *Device) InstalledApp(pkg string) bool {
 	return len(strings.Split(device.Shell("adb shell pm list packages "+pkg), "\n")) > 0
 }
 
-// ScreenRecord records the screen as video with limited duration
+// ScreenRecord records the screen as video with limited duration.
 // Uses mp4 format
 func (device *Device) ScreenRecord(filename string, duration int) {
 	device.Shell(fmt.Sprintf("adb shell screenrecord -time-limit %d /sdcard/%s", duration, filename))
@@ -268,7 +271,7 @@ func (device *Device) ScreenCap(filename string) {
 	device.Shell("adb shell screencap /sdcard/" + filename)
 }
 
-// Root enables all adb commands to be run as root
+// Root enables all adb commands to be run as root.
 // Only works in rooted devices or emulators
 func (device *Device) Root() error {
 	output := device.Shell("adb root")
@@ -278,7 +281,7 @@ func (device *Device) Root() error {
 	return nil
 }
 
-// XMLtoCoords converts XML block coords to center tap coords
+// XMLtoCoords converts XML block coords to center tap coords.
 // Accepts [x1,y1][x2,y2] format as string and returns [2]int coords
 func XMLtoCoords(xmlcoords string) ([2]int, error) {
 	re := regexp.MustCompile("(\\[\\d+,\\d+\\]\\[\\d+,\\d+\\])")
@@ -310,7 +313,9 @@ func XMLtoCoords(xmlcoords string) ([2]int, error) {
 }
 
 // Orientation returns the devices orientation
+//
 // 0: portrait
+//
 // 1: landscape
 func (device *Device) Orientation() (int, error) {
 	output := device.Shell("adb shell dumpsys input | grep 'SurfaceOrientation' | awk '{ print $2 }'")
@@ -365,8 +370,10 @@ func (device *Device) Shutdown() {
 	device.Shell("adb shell reboot -p")
 }
 
-// WaitApp waits until the given app appears on the foreground
-// Waits for given miliseconds after each try
+// WaitApp waits until the given app appears on the foreground.
+//
+// Waits for given miliseconds after each try.
+//
 // Note: Has limited retry count
 func (device *Device) WaitApp(pkg string, delay, maxRetry int) bool {
 	for !strings.Contains(device.Foreground(), pkg) {
@@ -439,8 +446,8 @@ func (device *Device) HasInScreen(newDump bool, want ...string) bool {
 	return false
 }
 
-// WaitInScreen waits until the wanted text appear on screen
-// It requires a max retry count to avoid endless loop
+// WaitInScreen waits until the wanted text appear on screen.
+// It requires a max retry count to avoid endless loop.
 func (device *Device) WaitInScreen(attemptCount int, want ...string) error {
 	attempts := attemptCount
 	if device.DefaultSleep == 0 {
@@ -460,6 +467,72 @@ func (device *Device) WaitInScreen(attemptCount int, want ...string) error {
 		attempts--
 	}
 	return nil
+}
+
+//
+// ScreenTimeout sets the screen off timeout to key1 seconds
+//
+// Returns a function to be deferred setting timeout to key2 seconds
+//
+// Accepts only the following time intervals:
+//
+// 15s
+//
+// 30s
+//
+// 1m
+//
+// 2m
+//
+// 5m
+//
+// 10m
+//
+// 30m
+func (device *Device) ScreenTimeout(key1, key2 string) (func(), error) {
+	timeout := map[string]string{
+		"15s": "15000",
+		"30s": "30000",
+		"1m":  "60000",
+		"2m":  "120000",
+		"5m":  "300000",
+		"10m": "600000",
+		"30m": "1800000",
+	}
+	invalid := true
+	for mapKey := range timeout {
+		if key1 == mapKey || key2 == mapKey {
+			invalid = false
+			break
+		}
+	}
+	if invalid {
+		fmtTimeout := "key1 and key2 must be one of the following:\n"
+		for key := range timeout {
+			fmtTimeout += fmt.Sprintf("key: % 3s\n", key)
+		}
+		return func() {}, fmt.Errorf("invalid keys:\n%s", fmtTimeout)
+	}
+	if device.Log {
+		log.Printf("Setting screen off timeout to %ss", strings.TrimSuffix(timeout[key1], "000"))
+	}
+	output := device.Shell(fmt.Sprintf("adb shell settings put system screen_off_timeout %s", timeout[key1]))
+	if len(output) > 0 {
+		return func() {}, fmt.Errorf("Failed to set screen_off_timeout: %s", output)
+	}
+	return func() {
+		if key1 == key2 {
+			return
+		}
+		if device.Log {
+			log.Printf("Setting screen off timeout to %ss", strings.TrimSuffix(timeout[key2], "000"))
+		}
+		output := device.Shell(fmt.Sprintf("adb shell settings put system screen_off_timeout %s", timeout[key2]))
+		if len(output) > 0 {
+			log.Printf("Failed to set screen_off_timeout: %s", output)
+			return
+		}
+	}, nil
 }
 
 func cleanString(input string) string {
