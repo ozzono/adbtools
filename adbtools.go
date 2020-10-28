@@ -489,7 +489,8 @@ func (device *Device) WaitInScreen(attemptCount int, want ...string) error {
 // 10m
 //
 // 30m
-func (device *Device) ScreenTimeout(key1, key2 string) (func(), error) {
+func (device *Device) ScreenTimeout(waitTime string) (func(), error) {
+	// set and validate waitTime
 	timeout := map[string]string{
 		"15s": "15000",
 		"30s": "30000",
@@ -501,33 +502,38 @@ func (device *Device) ScreenTimeout(key1, key2 string) (func(), error) {
 	}
 	invalid := true
 	for mapKey := range timeout {
-		if key1 == mapKey || key2 == mapKey {
+		if waitTime == mapKey {
 			invalid = false
 			break
 		}
 	}
 	if invalid {
-		fmtTimeout := "key1 and key2 must be one of the following:\n"
+		fmtTimeout := "wait time must be one of the following:\n"
 		for key := range timeout {
 			fmtTimeout += fmt.Sprintf("key: % 3s\n", key)
 		}
 		return func() {}, fmt.Errorf("invalid keys:\n%s", fmtTimeout)
 	}
-	if device.Log {
-		log.Printf("Setting screen off timeout to %ss", strings.TrimSuffix(timeout[key1], "000"))
+
+	current := cleanString(device.Shell("adb shell settings get system screen_off_timeout"))
+	if timeout[waitTime] == current {
+		return func() {}, nil
 	}
-	output := device.Shell(fmt.Sprintf("adb shell settings put system screen_off_timeout %s", timeout[key1]))
+
+	// sets screen off timeout
+	if device.Log {
+		log.Printf("Setting screen off timeout to %ss", strings.TrimSuffix(timeout[waitTime], "000"))
+	}
+
+	output := device.Shell(fmt.Sprintf("adb shell settings put system screen_off_timeout %s", timeout[waitTime]))
 	if len(output) > 0 {
 		return func() {}, fmt.Errorf("Failed to set screen_off_timeout: %s", output)
 	}
 	return func() {
-		if key1 == key2 {
-			return
-		}
 		if device.Log {
-			log.Printf("Setting screen off timeout to %ss", strings.TrimSuffix(timeout[key2], "000"))
+			log.Printf("Setting screen off timeout back to %ss", current)
 		}
-		output := device.Shell(fmt.Sprintf("adb shell settings put system screen_off_timeout %s", timeout[key2]))
+		output := device.Shell(fmt.Sprintf("adb shell settings put system screen_off_timeout %s", current))
 		if len(output) > 0 {
 			log.Printf("Failed to set screen_off_timeout: %s", output)
 			return
