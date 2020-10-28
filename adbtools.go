@@ -65,6 +65,9 @@ func (device *Device) TapScreen(x, y, delay int) {
 }
 
 func (device *Device) sleep(delay int) {
+	if device.DefaultSleep == 0 {
+		device.DefaultSleep = 100
+	}
 	time.Sleep(time.Duration(device.DefaultSleep*delay) * time.Millisecond)
 }
 
@@ -72,9 +75,18 @@ func (device *Device) sleep(delay int) {
 func (device *Device) XMLScreen(newdump bool) string {
 	if len(device.dumpPath) == 0 {
 		device.dumpPath = "/sdcard/window_dump.xml"
+		if device.Log {
+			log.Println("setting default dump path")
+		}
 	}
 	if newdump {
-		device.dumpPath = cleanString(strings.TrimPrefix(device.Shell("adb shell uiautomator dump"), "UI hierchary dumped to: "))
+		dumpPath := cleanString(strings.TrimPrefix(device.Shell("adb shell uiautomator dump"), "UI hierchary dumped to: "))
+		if device.dumpPath != dumpPath {
+			device.dumpPath = dumpPath
+			if device.Log {
+				log.Printf("resetting default dump path to '%s'", device.dumpPath)
+			}
+		}
 	}
 	return device.Shell(fmt.Sprintf("adb shell cat %s", device.dumpPath))
 }
@@ -132,24 +144,23 @@ func (device *Device) PageDown() {
 }
 
 // PageUp scrolls up a fixed amount of pixels
-// Scroll up a fixed amount of pixels
+// Scrolls up a fixed amount of pixels
 func (device *Device) PageUp() {
 	// code 92 is equivalent to "KEYCODE_PAGE_UP"
 	device.Shell("adb shell input keyevent 92")
 }
 
 // Devices returns all the connected devices´ ID
-func Devices() ([]Device, error) {
+func Devices(Log bool) ([]Device, error) {
 	output := []Device{}
 	count := 0
 	cmd, err := shell.Cmd("adb devices")
 	if err != nil {
-		log.Printf("shell.Cmd err: %v", err)
-		return nil, err
+		return nil, fmt.Errorf("shell.Cmd err: %v", err)
 	}
 	for _, row := range strings.Split(cmd, "\n") {
 		if strings.HasSuffix(row, "device") {
-			output = append(output, Device{ID: strings.Split(row, "	")[0], Log: false})
+			output = append(output, Device{ID: strings.Split(row, "	")[0], Log: Log, DefaultSleep: 100})
 			count++
 		} else if strings.HasSuffix(row, "offline") {
 			id := strings.Split(row, "	")[0]
@@ -164,13 +175,13 @@ func Devices() ([]Device, error) {
 }
 
 //NewDevice creates a new device management struct
-func NewDevice(deviceID string) Device {
-	return Device{ID: deviceID, Log: false}
+func NewDevice(deviceID string, log bool) Device {
+	return Device{ID: deviceID, Log: log}
 }
 
 // StartAnbox starts an Anbox Emulator
 // Before starting it only checks if Anbox is installed
-// Alert: Does not check if it's dependencies are installed
+// Alert: Does not check if its dependencies are installed
 // To install dependencies check the link below:
 // https://docs.anbox.io/userguide/install_kernel_modules.html
 // To install Anbox check the link below:
@@ -266,7 +277,7 @@ func (device *Device) Root() error {
 	return nil
 }
 
-// XMLtoCoords coverts XML block coords to center tap coords
+// XMLtoCoords converts XML block coords to center tap coords
 // Accepts [x1,y1][x2,y2] format as string and returns [2]int coords
 func XMLtoCoords(xmlcoords string) ([2]int, error) {
 	re := regexp.MustCompile("(\\[\\d+,\\d+\\]\\[\\d+,\\d+\\])")
@@ -415,22 +426,23 @@ func (device *Device) HasInScreen(newDump bool, want ...string) bool {
 
 // WaitInScreen waits until the wanted text appear on screen
 // It requires a max retry count to avoid endless loop
-func (device *Device) WaitInScreen(retryCount int, want ...string) error {
+func (device *Device) WaitInScreen(attemptCount int, want ...string) error {
+	attempts := attemptCount
 	if device.DefaultSleep == 0 {
 		return fmt.Errorf("Invalid device.DefaultSleep; must be > 0")
 	}
 	for !device.HasInScreen(true, want...) {
+		if attempts == 0 {
+			return fmt.Errorf("Reached max retry attempts of %d", attemptCount)
+		}
 		if device.Log {
-			log.Println("Waiting app load")
+			log.Printf("Waiting app load; %d attempts left", attempts)
 		}
 		device.sleep(10)
 		if device.HasInScreen(true, want...) {
 			break
 		}
-		if retryCount == 0 {
-			return fmt.Errorf("Reached max retry count of %d", retryCount)
-		}
-		retryCount--
+		attempts--
 	}
 	return nil
 }
