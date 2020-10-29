@@ -541,11 +541,26 @@ func (device *Device) ScreenTimeout(waitTime string) (func(), error) {
 	}, nil
 }
 
+// NodeList returns the unnested list of xml nodes
+func (device *Device) NodeList(newDump bool) []string {
+	nodes := []string{}
+	for _, item := range strings.Split(strings.Replace(device.XMLScreen(newDump), "><", ">\n<", -1), "\n") {
+		if match("(\\[\\d+,\\d+\\]\\[\\d+,\\d+\\])", item) {
+			nodes = append(nodes, item)
+		}
+	}
+	return nodes
+}
+
 func cleanString(input string) string {
 	input = strings.Replace(input, " ", "", -1)
 	input = strings.Replace(input, "\n", "", -1)
 	input = strings.Replace(input, "\r", "", -1)
 	return input
+}
+
+func match(exp, text string) bool {
+	return regexp.MustCompile(exp).MatchString(text)
 }
 
 //TODO: this method requires revision

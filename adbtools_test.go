@@ -56,6 +56,12 @@ func TestMethods(t *testing.T) {
 		return
 	}
 
+	err = test.testNodeList()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 }
 
 func (t *testData) testDeviceSettings() error {
@@ -115,5 +121,16 @@ func (t *testData) testWaitInScreen() error {
 		return err
 	}
 	t.test.Log("WaitInScreen test passed")
+	return nil
+}
+
+func (t *testData) testNodeList() error {
+	t.test.Log("testing NodeList; using firefox as test app")
+	nodes := t.device.NodeList(true)
+	if len(nodes) == 0 {
+		return fmt.Errorf("Failed to fetch xml tree and separate the nodes")
+	}
+	t.test.Logf("XML tree has %d nodes", len(nodes))
+	t.test.Log("NodeList test passed")
 	return nil
 }
