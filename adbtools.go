@@ -43,7 +43,7 @@ func (device *Device) Shell(arg string) string {
 	}
 	out, err := shell.Cmd(arg)
 	if err != nil {
-		log.Printf("shell.Cmd err: %v", err)
+		return fmt.Sprintf("shell.Cmd err: %v", err)
 	}
 	return out
 }
@@ -150,11 +150,11 @@ func (device *Device) PageUp() {
 func Devices(Log bool) ([]Device, error) {
 	output := []Device{}
 	count := 0
-	cmd, err := shell.Cmd("adb devices")
+	out, err := shell.Cmd("adb devices")
 	if err != nil {
 		return nil, fmt.Errorf("shell.Cmd err: %v", err)
 	}
-	for _, row := range strings.Split(cmd, "\n") {
+	for _, row := range strings.Split(out, "\n") {
 		if strings.HasSuffix(row, "device") {
 			output = append(output, Device{ID: strings.Split(row, "	")[0], Log: Log, DefaultSleep: 100})
 			count++
@@ -193,7 +193,7 @@ func StartAnbox() error {
 	if err != nil {
 		return fmt.Errorf("shell.Cmd err: %v", err)
 	}
-	if len(whereis) == 0 {
+	if len(cleanString(whereis)) == 0 {
 		return fmt.Errorf("anbox package not found")
 	}
 	log.Println("Starting Anbox emulator")
@@ -207,38 +207,76 @@ func StartAnbox() error {
 // StartAVD starts the emulator with the given name
 //
 // This method requires the Android Studio to be installed
+// and allows the calling to be verified or not
 //
-// ALERT: This method must be used as goroutine
+// The returned function closes the emulator
 //
-func StartAVD(name string) error {
-	cmd, err := shell.Cmd("which android-studio")
+// ALERT: Requires the emulator to be closed, elsewise the emulator remains active
+func StartAVD(verified bool, deviceName string) (func(), error) {
+	active, err := isAVDRunning(deviceName)
 	if err != nil {
-		return fmt.Errorf("shell.Cmd err: %v", err)
+		return func() {}, err
 	}
-	if len(strings.Split(cmd, "\n")) == 0 {
-		return fmt.Errorf("Cannot start AVD emulator; Android Studio is not installed")
+	if active {
+		log.Printf("%s emulator already running", deviceName)
+		log.Println("returned function won't close the emulator")
+		return func() {}, nil
 	}
-	cmd, err = shell.Cmd("adb devices")
+	emulatorPath := fmt.Sprintf("%v/Android/Sdk/emulator/emulator", os.Getenv("HOME"))
+	if err := checkEnv(emulatorPath, deviceName); err != nil {
+		return func() {}, fmt.Errorf("checkEnv err: %v", err)
+	}
+
+	log.Printf("Booting '%s' emulator ", deviceName)
+	pid, err := shell.LooseCmd(fmt.Sprintf("%s -avd %s", emulatorPath, deviceName))
 	if err != nil {
-		return fmt.Errorf("shell.Cmd err: %v", err)
+		return func() {}, fmt.Errorf("LooseCmd err: %v", err)
 	}
-	if strings.Contains(cmd, name) {
-		return fmt.Errorf("Cannot start AVD emulator; %s is already running", name)
+
+	log.Printf("successfully started avd '%s'; pid: %d", deviceName, pid)
+	return func() {
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			log.Printf("os.FindProcess err: %v", err)
+			return
+		}
+		err = proc.Kill()
+		if err != nil {
+			log.Printf("proc.Kill err: %v", err)
+			return
+		}
+		log.Printf("Closing '%s' emulator ", deviceName)
+	}, nil
+}
+
+// DeviceReady returns the readiness state of the device
+func (device *Device) DeviceReady() bool {
+	return cleanString(device.Shell("adb shell getprop sys.boot_completed")) == "1"
+}
+
+// WaitDeviceReady waits until the device.
+// It's specially useful after a fresh boot.
+func (device *Device) WaitDeviceReady(attemptCount int) error {
+	attempts := attemptCount
+	if device.DefaultSleep == 0 {
+		if device.Log {
+			log.Println("setting default sleep to 100ms")
+		}
+		device.DefaultSleep = 100
 	}
-	home := os.Getenv("HOME")
-	cmd, err = shell.Cmd(fmt.Sprintf("ls %v/Android/Sdk/emulator/emulator", home))
-	if err != nil {
-		return fmt.Errorf("shell.Cmd err: %v", err)
+	for !device.DeviceReady() && attempts > 0 {
+		if attempts == 0 {
+			return fmt.Errorf("reached max retry attempts of %d", attemptCount)
+		}
+		if device.Log {
+			log.Printf("waiting app load; %d attempts left", attempts)
+		}
+		device.sleep(10)
+		if device.DeviceReady() {
+			break
+		}
+		attempts--
 	}
-	if len(strings.Split(cmd, "\n")) == 0 {
-		return fmt.Errorf("Cannot start AVD emulator; AVD manager not found")
-	}
-	list, err := shell.Cmd(fmt.Sprintf("%v/Android/Sdk/emulator/emulator -list-avds", home))
-	if !(strings.Contains(list, name)) {
-		return fmt.Errorf("Cannot start AVD emulator; %v device not found", name)
-	}
-	log.Printf("Booting avd: %v", name)
-	shell.Cmd(home + "/Android/Sdk/emulator/emulator -avd " + name)
 	return nil
 }
 
@@ -552,6 +590,28 @@ func (device *Device) NodeList(newDump bool) []string {
 	return nodes
 }
 
+func isAVDRunning(name string) (bool, error) {
+
+	psList := []string{}
+	out, err := shell.Cmd("ps -ef")
+	if err != nil {
+		return false, fmt.Errorf("shell.Cmd err: %v", err)
+	}
+	for _, item := range strings.Split(out, "\n") {
+		if strings.Contains(item, "emulator") &&
+			strings.Contains(item, "-avd") &&
+			strings.Contains(item, name) {
+			psList = append(psList, item)
+		}
+	}
+	for i := range psList {
+		if strings.HasSuffix(psList[i], name) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func cleanString(input string) string {
 	input = strings.Replace(input, " ", "", -1)
 	input = strings.Replace(input, "\n", "", -1)
@@ -561,6 +621,30 @@ func cleanString(input string) string {
 
 func match(exp, text string) bool {
 	return regexp.MustCompile(exp).MatchString(text)
+}
+
+func checkEnv(path, device string) error {
+	log.Println("Verifying environment settings")
+	out, err := shell.Cmd("which android-studio")
+	if err != nil {
+		return fmt.Errorf("shell.Cmd err: %v", err)
+	}
+	if !strings.Contains(out, "android-studio") {
+		return fmt.Errorf("Cannot start AVD emulator; Android Studio is not installed; output: %s", out)
+	}
+	out, err = shell.Cmd("ls " + path)
+	if err != nil {
+		return fmt.Errorf("shell.Cmd err: %v; cmd: %s; output: %s", err, "ls "+path, out)
+	}
+	if !strings.Contains(out, path) {
+		return fmt.Errorf("Cannot start AVD emulator; AVD manager not found")
+	}
+	list, err := shell.Cmd(fmt.Sprintf("%s -list-avds", path))
+	if !strings.Contains(list, device) {
+		return fmt.Errorf("Cannot start AVD emulator; %v device not found", device)
+	}
+	log.Println("Successfully verified environment settings")
+	return nil
 }
 
 //TODO: this method requires revision
