@@ -71,6 +71,18 @@ func TestMethods(t *testing.T) {
 		return
 	}
 
+	err = test.testInstalledApp(chrome)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	err = test.testInstalledApp(app{pkg: "non.existent.app"})
+	if err == nil {
+		t.Error("this should return a 'not found' error")
+		return
+	}
+
 	err = test.testStartApp()
 	if err != nil {
 		t.Error(err)
@@ -89,6 +101,16 @@ func TestMethods(t *testing.T) {
 		return
 	}
 
+}
+
+func (t *testData) testInstalledApp(app app) error {
+	t.test.Logf("testing InstalledApp with %s package", app.pkg)
+	if t.device.InstalledApp(app.pkg) {
+		t.test.Logf("%s package found", app.pkg)
+		return nil
+	}
+	t.test.Logf("%s package not found", app.pkg)
+	return fmt.Errorf("app %s not installed", app.pkg)
 }
 
 func (t *testData) testDeviceSettings() error {
@@ -183,8 +205,10 @@ func testStartAVD(deviceName string, t *testing.T) (func(), error) {
 	if err != nil {
 		t.Logf("d2: %v", err)
 	}
+	device := firstEmulator(d2)
+	device.WaitDeviceReady(5)
 	if len(d1) == len(d2) {
-		t.Logf("Failed to start the %s emulator; devices %#v", deviceName, d2)
+		t.Logf("Failed to start the %s emulator; devices found: %#v", deviceName, d2)
 	}
 	t.Log("successfully tested starting avd;")
 	t.Log("closing avd will be tested uppon defer")
@@ -204,4 +228,13 @@ func testStartAVD(deviceName string, t *testing.T) (func(), error) {
 		}
 		t.Logf("successfully tested closing '%s' emulator pid", deviceName)
 	}, nil
+}
+
+func firstEmulator(devices []Device) Device {
+	for i := range devices {
+		if strings.Contains(devices[i].ID, "emulator") {
+			return devices[i]
+		}
+	}
+	return Device{}
 }

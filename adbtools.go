@@ -323,7 +323,21 @@ func (device *Device) StartApp(pkg, activity, options string) error {
 
 // InstalledApp checks if the given app package is installed
 func (device *Device) InstalledApp(pkg string) bool {
-	return strings.Contains(device.Shell("adb shell pm list packages "+pkg), pkg)
+	if device.Log {
+		log.Printf("is %s installed?", pkg)
+	}
+	for _, item := range strings.Split(device.Shell("adb shell pm list packages "+pkg), "\n") {
+		if len(strings.Replace(item, " ", "", -1)) > 0 && strings.Contains(item, pkg) {
+			if device.Log {
+				log.Printf("found '%s'", item)
+			}
+			return true
+		}
+	}
+	if device.Log {
+		log.Printf("not found '%s'", pkg)
+	}
+	return false
 }
 
 // ScreenRecord records the screen as video with limited duration.
