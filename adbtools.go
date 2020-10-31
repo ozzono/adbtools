@@ -329,13 +329,13 @@ func (device *Device) InstalledApp(pkg string) bool {
 	for _, item := range strings.Split(device.Shell("adb shell pm list packages "+pkg), "\n") {
 		if len(strings.Replace(item, " ", "", -1)) > 0 && strings.Contains(item, pkg) {
 			if device.Log {
-				log.Printf("found '%s'", item)
+				log.Printf("'%s' found", item)
 			}
 			return true
 		}
 	}
 	if device.Log {
-		log.Printf("not found '%s'", pkg)
+		log.Printf("'%s' not found", pkg)
 	}
 	return false
 }
