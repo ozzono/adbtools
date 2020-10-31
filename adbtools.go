@@ -75,7 +75,7 @@ func (device *Device) sleep(delay int) {
 }
 
 // XMLScreen fetches the screen xml data
-func (device *Device) XMLScreen(newdump bool) string {
+func (device *Device) XMLScreen(newdump bool) (string, error) {
 	if device.Log {
 		log.Println("dumping screen xml")
 	}
@@ -86,7 +86,11 @@ func (device *Device) XMLScreen(newdump bool) string {
 		}
 	}
 	if newdump {
-		dumpPath := cleanString(strings.TrimPrefix(device.Shell("adb shell uiautomator dump"), "UI hierchary dumped to: "))
+		output := device.Shell("adb shell uiautomator dump")
+		if !strings.Contains(output, "xml") {
+			return "", fmt.Errorf("failed to dump xml screen; output: %v", output)
+		}
+		dumpPath := cleanString(strings.TrimPrefix(output, "UI hierchary dumped to: "))
 		if device.dumpPath != dumpPath {
 			device.dumpPath = dumpPath
 			if device.Log {
@@ -94,7 +98,7 @@ func (device *Device) XMLScreen(newdump bool) string {
 			}
 		}
 	}
-	return device.Shell(fmt.Sprintf("adb shell cat %s", device.dumpPath))
+	return device.Shell(fmt.Sprintf("adb shell cat %s", device.dumpPath)), nil
 }
 
 // TapCleanInput tap and cleans the input
@@ -522,8 +526,13 @@ func (device *Device) HasInScreen(newDump bool, want ...string) bool {
 		if device.Log {
 			log.Printf("Searching screen %s", strings.ToLower(normalize.Norm(want[i])))
 		}
+		screen, err := device.XMLScreen(newDump)
+		if err != nil {
+			log.Printf("XMLScreen err: %v", err)
+			return false
+		}
 		if strings.Contains(
-			strings.ToLower(normalize.Norm(device.XMLScreen(newDump))),
+			strings.ToLower(normalize.Norm(screen)),
 			strings.ToLower(normalize.Norm(want[i])),
 		) {
 			return true
@@ -645,7 +654,12 @@ func (device *Device) NodeList(newDump bool) []string {
 		log.Println("fetching node list")
 	}
 	nodes := []string{}
-	for _, item := range strings.Split(strings.Replace(device.XMLScreen(newDump), "><", ">\n<", -1), "\n") {
+	screen, err := device.XMLScreen(newDump)
+	if err != nil {
+		log.Printf("XMLScreen err: %v", err)
+		return []string{}
+	}
+	for _, item := range strings.Split(strings.Replace(screen, "><", ">\n<", -1), "\n") {
 		if match("(\\[\\d+,\\d+\\]\\[\\d+,\\d+\\])", item) {
 			nodes = append(nodes, item)
 		}
