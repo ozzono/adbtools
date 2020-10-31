@@ -2,6 +2,7 @@ package adbtools
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 )
@@ -52,7 +53,7 @@ func TestMethods(t *testing.T) {
 		t.Errorf("Failed to get device list: %v", err)
 		return
 	}
-	fmt.Printf("device: %#v\n", devices[0])
+
 	test := testData{
 		test:   t,
 		device: devices[0],
@@ -141,8 +142,10 @@ func (t *testData) testStartApp() error {
 
 func (t *testData) testWaitInScreen() error {
 	t.test.Log("testing WaitInScreen; using chrome as test app")
-	t.device.WakeUp()
-	t.device.Swipe([4]int{int(t.device.Screen.Width / 2), t.device.Screen.Height - 100, int(t.device.Screen.Width / 2), 100})
+	if !strings.Contains(t.device.ID, "emulator") {
+		t.device.WakeUp()
+		t.device.Swipe([4]int{int(t.device.Screen.Width / 2), t.device.Screen.Height - 100, int(t.device.Screen.Width / 2), 100})
+	}
 	if err := t.device.WaitInScreen(1, "Search or type web address"); err != nil {
 		return err
 	}
@@ -199,6 +202,6 @@ func testStartAVD(deviceName string, t *testing.T) (func(), error) {
 			t.Fatalf("Failed to stop the '%s' emulator", deviceName)
 			return
 		}
-		t.Logf("successfully closed '%s' emulator", deviceName)
+		t.Logf("successfully tested closing '%s' emulator pid", deviceName)
 	}, nil
 }

@@ -50,12 +50,18 @@ func (device *Device) Shell(arg string) string {
 
 // Foreground verifies if the given package is on foreground
 func (device *Device) Foreground() string {
+	if device.Log {
+		log.Println("screening after foreground app")
+	}
 	// TODO: futurally add string normalization
 	return strings.ToLower(device.Shell("adb shell dumpsys window windows|grep Focus"))
 }
 
 // TapScreen taps the given coords and waits the given delay in Milliseconds
 func (device *Device) TapScreen(x, y, delay int) {
+	if device.Log {
+		log.Printf("tapping [%d,%d]", x, y)
+	}
 	device.Shell(fmt.Sprintf("adb shell input tap %d %d", x, y))
 	device.sleep(delay)
 	return
@@ -70,6 +76,9 @@ func (device *Device) sleep(delay int) {
 
 // XMLScreen fetches the screen xml data
 func (device *Device) XMLScreen(newdump bool) string {
+	if device.Log {
+		log.Println("dumping screen xml")
+	}
 	if len(device.dumpPath) == 0 {
 		device.dumpPath = "/sdcard/window_dump.xml"
 		if device.Log {
@@ -90,6 +99,9 @@ func (device *Device) XMLScreen(newdump bool) string {
 
 // TapCleanInput tap and cleans the input
 func (device *Device) TapCleanInput(x, y, charcount int) {
+	if device.Log {
+		log.Printf("tapping [%d,%d] and cleaning input field", x, y)
+	}
 	charcount = charcount/2 + 1
 	device.TapScreen(x, y, 0)
 	device.Shell("adb shell input keyevent KEYCODE_MOVE_END")
@@ -100,16 +112,25 @@ func (device *Device) TapCleanInput(x, y, charcount int) {
 
 // Swipe swipes the screen with [x1,y1,x2,y2] coords format
 func (device *Device) Swipe(coords [4]int) {
+	if device.Log {
+		log.Printf("swiping from [%d,%d] to [%d,%d]", coords[0], coords[1], coords[2], coords[3])
+	}
 	device.Shell(fmt.Sprintf("adb shell input swipe %d %d %d %d", coords[0], coords[1], coords[2], coords[3]))
 }
 
 // CloseApp closes the app
 func (device *Device) CloseApp(app string) {
+	if device.Log {
+		log.Printf("closing %s", app)
+	}
 	device.Shell(fmt.Sprintf("adb shell am force-stop %s", app))
 }
 
 // ClearApp clears all the app data
 func (device *Device) ClearApp(app string) error {
+	if device.Log {
+		log.Printf("clearing %s", app)
+	}
 	output := device.Shell(fmt.Sprintf("adb shell pm clear %s", app))
 	if strings.Contains(output, "Success") {
 		return nil
@@ -119,6 +140,9 @@ func (device *Device) ClearApp(app string) error {
 
 //InputText inserts a given text in a selected input
 func (device *Device) InputText(text string, splitted bool) error {
+	if device.Log {
+		log.Printf("inputing text %s", text)
+	}
 	if len(text) == 0 {
 		return fmt.Errorf("invalid input; cannot be empty")
 	}
@@ -235,6 +259,10 @@ func StartAVD(verified bool, deviceName string) (func(), error) {
 
 	log.Printf("successfully started avd '%s'; pid: %d", deviceName, pid)
 	return func() {
+		if active {
+			log.Printf("'%s' emulator was alive before, will remain alive after", deviceName)
+			return
+		}
 		proc, err := os.FindProcess(pid)
 		if err != nil {
 			log.Printf("os.FindProcess err: %v", err)
@@ -437,11 +465,17 @@ func (device *Device) WaitApp(pkg string, delay, maxRetry int) bool {
 
 //WakeUp wakes the device up
 func (device *Device) WakeUp() {
+	if device.Log {
+		log.Println("waking the device up")
+	}
 	device.Shell("adb shell input keyevent KEYCODE_WAKEUP")
 }
 
 //ScreenSize fetches the physical screen size and return its height and width
 func (device *Device) ScreenSize() error {
+	if device.Log {
+		log.Println("fetching screen dimensions")
+	}
 	screen := device.Shell("adb shell wm size")
 	if !regexp.MustCompile("Physical size: (\\d+x\\d+)").MatchString(screen) {
 		return fmt.Errorf("Failed to fetch physical screen size; output: %s", screen)
@@ -454,11 +488,17 @@ func (device *Device) ScreenSize() error {
 
 // IsScreenON verifies if the is on
 func (device *Device) IsScreenON() bool {
+	if device.Log {
+		log.Println("is screen on?")
+	}
 	return strings.Contains(device.Shell("adb shell dumpsys power | grep state"), "ON")
 }
 
 //HasInScreen verifies if the wanted text appear on screen
 func (device *Device) HasInScreen(newDump bool, want ...string) bool {
+	if device.Log {
+		log.Printf("has in screen: %s", strings.Join(want, " or "))
+	}
 	for len(want) > 0 {
 		i := 0
 		if len(want) != 1 {
@@ -487,6 +527,9 @@ func (device *Device) HasInScreen(newDump bool, want ...string) bool {
 // WaitInScreen waits until the wanted text appear on screen.
 // It requires a max retry count to avoid endless loop.
 func (device *Device) WaitInScreen(attemptCount int, want ...string) error {
+	if device.Log {
+		log.Printf("wait in screen: %s", strings.Join(want, " or "))
+	}
 	attempts := attemptCount
 	if device.DefaultSleep == 0 {
 		return fmt.Errorf("Invalid device.DefaultSleep; must be > 0")
@@ -528,6 +571,9 @@ func (device *Device) WaitInScreen(attemptCount int, want ...string) error {
 //
 // 30m
 func (device *Device) ScreenTimeout(waitTime string) (func(), error) {
+	if device.Log {
+		log.Printf("setting screen off timeout to %s", waitTime)
+	}
 	// set and validate waitTime
 	timeout := map[string]string{
 		"15s": "15000",
@@ -581,6 +627,9 @@ func (device *Device) ScreenTimeout(waitTime string) (func(), error) {
 
 // NodeList returns the unnested list of xml nodes
 func (device *Device) NodeList(newDump bool) []string {
+	if device.Log {
+		log.Println("fetching node list")
+	}
 	nodes := []string{}
 	for _, item := range strings.Split(strings.Replace(device.XMLScreen(newDump), "><", ">\n<", -1), "\n") {
 		if match("(\\[\\d+,\\d+\\]\\[\\d+,\\d+\\])", item) {
