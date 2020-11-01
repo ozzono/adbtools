@@ -158,7 +158,7 @@ func (device *Device) InputText(text string, splitted bool) error {
 		}
 		return nil
 	}
-	device.Shell("adb shell input text %s" + text)
+	device.Shell("adb shell input text " + text)
 	return nil
 }
 
