@@ -2,6 +2,8 @@ package adbtools
 
 import (
 	"fmt"
+	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -101,6 +103,12 @@ func TestMethods(t *testing.T) {
 		return
 	}
 
+	err = test.testHasInScreen()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 }
 
 func (t *testData) testInstalledApp(app app) error {
@@ -186,6 +194,24 @@ func (t *testData) testNodeList() error {
 	return nil
 }
 
+func (t *testData) testHasInScreen() error {
+	t.test.Log("starting HasInScreen test")
+	arr := []string{}
+	j := randInt(rand.New(rand.NewSource(time.Now().UnixNano())).Int()%10+5) + 2
+	for i := 0; i < j; i++ {
+		newString := randString()
+		arr = append(arr, newString)
+	}
+	newArr := make([]string, len(arr))
+	newArr = arr
+	t.device.HasInScreen(true, arr...)
+	if !reflect.DeepEqual(arr, newArr) {
+		return fmt.Errorf("HasInScreen changed the inputed array")
+	}
+	t.test.Log("successfully teste HasInScreen")
+	return nil
+}
+
 func testStartAVD(deviceName string, t *testing.T) (func(), error) {
 	d1, err := Devices(false)
 	if err != nil {
@@ -237,4 +263,17 @@ func firstEmulator(devices []Device) Device {
 		}
 	}
 	return Device{}
+}
+func randInt(n int) int {
+	return rand.New(rand.NewSource(time.Now().UnixNano() + int64(n))).Intn(n)
+}
+
+func randString() string {
+	charSet := "abcdefghijklmnopqrstuvxywz"
+	output := ""
+	j := randInt(5) + 5
+	for i := 0; i < j; i++ {
+		output += string(charSet[randInt(len(charSet))])
+	}
+	return string(output)
 }

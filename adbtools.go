@@ -517,6 +517,15 @@ func (device *Device) HasInScreen(newDump bool, want ...string) bool {
 	if device.Log {
 		log.Printf("has in screen: %s", strings.Join(want, " or "))
 	}
+	draw := func(arr []string, index int) []string {
+		if len(arr) == 1 {
+			arr = make([]string, 0)
+		} else {
+			arr = make([]string, len(arr))
+		}
+		arr = append(arr[:index], arr[index+1:]...)
+		return arr
+	}
 	for len(want) > 0 {
 		i := 0
 		if len(want) != 1 {
@@ -537,12 +546,7 @@ func (device *Device) HasInScreen(newDump bool, want ...string) bool {
 		) {
 			return true
 		}
-
-		if len(want) != 1 {
-			want = append(want[:i], want[i+1:]...)
-		} else {
-			want = want[1:]
-		}
+		want = draw(want, i)
 	}
 	return false
 }
