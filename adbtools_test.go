@@ -176,7 +176,7 @@ func (t *testData) testWaitInScreen() error {
 		t.device.WakeUp()
 		t.device.Swipe([4]int{int(t.device.Screen.Width / 2), t.device.Screen.Height - 100, int(t.device.Screen.Width / 2), 100})
 	}
-	if err := t.device.WaitInScreen(1, "Search or type web address"); err != nil {
+	if err := t.device.WaitInScreen(5, "Search or type web address"); err != nil {
 		return err
 	}
 	t.test.Log("WaitInScreen test passed")
@@ -203,7 +203,7 @@ func (t *testData) testHasInScreen() error {
 		arr = append(arr, newString)
 	}
 	newArr := make([]string, len(arr))
-	newArr = arr
+	copy(newArr, arr)
 	t.device.HasInScreen(true, arr...)
 	if !reflect.DeepEqual(arr, newArr) {
 		return fmt.Errorf("HasInScreen changed the inputed array")

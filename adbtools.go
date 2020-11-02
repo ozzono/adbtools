@@ -514,35 +514,34 @@ func (device *Device) IsScreenON() bool {
 
 //HasInScreen verifies if the wanted text appear on screen
 func (device *Device) HasInScreen(newDump bool, want ...string) bool {
+	newWant := make([]string, len(want))
+	j := copy(newWant, want)
+	if j != len(want) {
+		log.Printf("something went wrong on copying %v; copied items: %d", want, j)
+		return false
+	}
 	if device.Log {
-		log.Printf("has in screen: '%s'", strings.Join(want, "' or '"))
+		log.Printf("has in screen: '%s'", strings.Join(newWant, "' or '"))
 	}
-	draw := func(arr []string, index int) []string {
-		newArr := []string{}
-		newArr = append(arr[:index], arr[index+1:]...)
-		return newArr
-	}
-	for len(want) > 0 {
-		i := 0
-		if len(want) != 1 {
-			i = rand.New(rand.NewSource(time.Now().UnixNano())).Intn(len(want) - 1)
-		}
-
-		if device.Log {
-			log.Printf("Searching screen %s", strings.ToLower(normalize.Norm(want[i])))
-		}
+	for len(newWant) > 0 {
 		screen, err := device.XMLScreen(newDump)
 		if err != nil {
 			log.Printf("XMLScreen err: %v", err)
 			return false
 		}
+
+		i := rand.New(rand.NewSource(time.Now().UnixNano())).Intn(len(newWant))
+		if device.Log {
+			log.Printf("Searching screen %s", strings.ToLower(normalize.Norm(newWant[i])))
+		}
+
 		if strings.Contains(
 			strings.ToLower(normalize.Norm(screen)),
-			strings.ToLower(normalize.Norm(want[i])),
+			strings.ToLower(normalize.Norm(newWant[i])),
 		) {
 			return true
 		}
-		want = draw(want, i)
+		newWant = append(newWant[:i], newWant[i+1:]...)
 	}
 	return false
 }
@@ -558,6 +557,7 @@ func (device *Device) WaitInScreen(attemptCount int, want ...string) error {
 		return fmt.Errorf("Invalid device.DefaultSleep; must be > 0")
 	}
 	for !device.HasInScreen(true, want...) {
+		attempts--
 		if attempts == 0 {
 			return fmt.Errorf("Reached max retry attempts of %d", attemptCount)
 		}
@@ -565,10 +565,6 @@ func (device *Device) WaitInScreen(attemptCount int, want ...string) error {
 			log.Printf("Waiting app load; %d attempts left", attempts)
 		}
 		device.sleep(10)
-		if device.HasInScreen(true, want...) {
-			break
-		}
-		attempts--
 	}
 	return nil
 }
