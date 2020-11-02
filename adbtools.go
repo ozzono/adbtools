@@ -515,16 +515,12 @@ func (device *Device) IsScreenON() bool {
 //HasInScreen verifies if the wanted text appear on screen
 func (device *Device) HasInScreen(newDump bool, want ...string) bool {
 	if device.Log {
-		log.Printf("has in screen: %s", strings.Join(want, " or "))
+		log.Printf("has in screen: '%s'", strings.Join(want, "' or '"))
 	}
 	draw := func(arr []string, index int) []string {
-		if len(arr) == 1 {
-			arr = make([]string, 0)
-		} else {
-			arr = make([]string, len(arr))
-		}
-		arr = append(arr[:index], arr[index+1:]...)
-		return arr
+		newArr := []string{}
+		newArr = append(arr[:index], arr[index+1:]...)
+		return newArr
 	}
 	for len(want) > 0 {
 		i := 0
