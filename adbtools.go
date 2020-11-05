@@ -663,6 +663,32 @@ func (device *Device) NodeList(newDump bool) []string {
 	return nodes
 }
 
+// Exp2Tap taps the screen in the coordinates
+// fetched using a regular expression and the screen's xml dump
+func (device *Device) Exp2Tap(expression string) error {
+	if device.Log {
+		log.Println("fetching coords from expression")
+	}
+	xmlScreen, err := device.XMLScreen(true)
+	if err != nil {
+		return err
+	}
+	coords, err := XMLtoCoords(func(exp, text string) []string {
+		re := regexp.MustCompile(exp)
+		matches := re.FindStringSubmatch(text)
+		if len(matches) < 1 {
+			log.Printf("unable to find match for exp %s\n", exp)
+			return []string{}
+		}
+		return matches
+	}(expression, xmlScreen)[1])
+	if err != nil {
+		return err
+	}
+	device.TapScreen(coords[0], coords[1], 10)
+	return nil
+}
+
 func isAVDRunning(name string) (bool, error) {
 
 	psList := []string{}
