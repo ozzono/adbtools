@@ -154,7 +154,7 @@ func (device *Device) InputText(text string, splitted bool) error {
 	text = strings.Replace(text, " ", "\\s", -1)
 	if splitted {
 		for i := range text {
-			device.Shell(fmt.Sprintf("adb shell input text %v", text[i]))
+			device.Shell(fmt.Sprintf("adb shell input text %v", string(text[i])))
 		}
 		return nil
 	}
