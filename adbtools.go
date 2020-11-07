@@ -378,6 +378,7 @@ func (device *Device) Root() error {
 // XMLtoCoords converts XML block coords to center tap coords.
 // Accepts [x1,y1][x2,y2] format as string and returns [2]int coords
 func XMLtoCoords(xmlcoords string) ([2]int, error) {
+	log.Println("fetching coords from xml screen")
 	re := regexp.MustCompile("(\\[\\d+,\\d+\\]\\[\\d+,\\d+\\])")
 	if !re.MatchString(xmlcoords) {
 		return [2]int{0, 0}, fmt.Errorf("Unable to parse xmlcoords; Invalid format: %s", xmlcoords)
