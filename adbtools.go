@@ -683,18 +683,17 @@ func (device *Device) Exp2Tap(expression string) error {
 	if err != nil {
 		return err
 	}
-	coords, err := XMLtoCoords(func(exp, text string) []string {
-		re := regexp.MustCompile(exp)
-		matches := re.FindStringSubmatch(text)
-		if len(matches) < 1 {
-			log.Printf("unable to find match for exp %s\n", exp)
-			return []string{}
-		}
-		return matches
-	}(expression, xmlScreen)[1])
+
+	matches := regexp.MustCompile(expression).FindStringSubmatch(xmlScreen)
+	if len(matches) < 1 {
+		return fmt.Errorf("unable to find match for exp %s", expression)
+	}
+
+	coords, err := XMLtoCoords(matches[1])
 	if err != nil {
 		return err
 	}
+
 	device.TapScreen(coords[0], coords[1], 10)
 	return nil
 }
