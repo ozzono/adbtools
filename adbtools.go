@@ -88,11 +88,12 @@ func (device *Device) XMLScreen(newdump bool) (string, error) {
 	if newdump {
 		output := device.Shell("adb shell uiautomator dump")
 		max := 10
-		for !strings.Contains(output, "null root node returned by UiTestAutomationBridge") {
+		for strings.Contains(output, "null root node returned by UiTestAutomationBridge") {
 			max--
 			if max == 0 {
 				return "", fmt.Errorf("failed to fetch xml screen data; null root node returned by UiTestAutomationBridge")
 			}
+			log.Printf("retrying XMLScreen: %s", output)
 			output = device.Shell("adb shell uiautomator dump")
 
 		}
