@@ -677,6 +677,9 @@ func (device *Device) NodeList(newDump bool) []string {
 // Exp2Tap taps the screen in the coordinates
 // fetched using a regular expression and the screen's xml dump
 func (device *Device) Exp2Tap(expression string) error {
+	if len(expression) == 0 {
+		return fmt.Errorf("invalid expression; cannot be empty")
+	}
 	if device.Log {
 		log.Println("fetching coords from expression")
 	}
