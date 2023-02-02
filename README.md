@@ -1,4 +1,4 @@
 # adbtools
-This package has the purpose of concentrating many of the most needed and useful adb commands and easining its usage with Go.
+This package concentrates on many of the most needed and helpful adb commands, easing its usage with Go.
 
 It requires adb installed and a connected android device with debug permission.
